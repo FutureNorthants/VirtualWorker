@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31005.135
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EmailChecker", "..\EmailChecker\EmailChecker\EmailChecker.csproj", "{08A7F97B-9D25-4AF0-A7F6-0C9B610874DC}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CheckForLocation", "..\CheckForLocation\CheckForLocation.csproj", "{BF5AACD7-E029-4DE9-B5C9-5229DB9A692F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{08A7F97B-9D25-4AF0-A7F6-0C9B610874DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{08A7F97B-9D25-4AF0-A7F6-0C9B610874DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{08A7F97B-9D25-4AF0-A7F6-0C9B610874DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{08A7F97B-9D25-4AF0-A7F6-0C9B610874DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BF5AACD7-E029-4DE9-B5C9-5229DB9A692F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BF5AACD7-E029-4DE9-B5C9-5229DB9A692F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BF5AACD7-E029-4DE9-B5C9-5229DB9A692F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BF5AACD7-E029-4DE9-B5C9-5229DB9A692F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6FCD3CAE-A781-4930-98CF-590909FFF89D}
+	EndGlobalSection
+EndGlobal
