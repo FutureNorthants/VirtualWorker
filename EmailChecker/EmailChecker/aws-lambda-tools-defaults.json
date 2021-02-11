@@ -1,0 +1,25 @@
+
+{
+    "Information" : [
+        "This file provides default values for the deployment wizard inside Visual Studio and the AWS Lambda commands added to the .NET Core CLI.",
+        "To learn more about the Lambda commands with the .NET Core CLI execute the following command at the command line in the project root directory.",
+        "dotnet lambda help",
+        "All the command line options for the Lambda command can be specified in this file."
+    ],
+    "profile"     : "default",
+    "region"      : "eu-west-1",
+    "configuration" : "Release",
+    "framework"     : "netcoreapp2.1",
+    "function-runtime" : "dotnetcore2.1",
+    "function-memory-size" : 256,
+    "function-timeout"     : 30,
+    "function-handler"     : "EmailChecker::EmailChecker.Function::FunctionHandler",
+    "function-name"        : "EmailChecker",
+    "function-role"        : "arn:aws:iam::898823515462:role/lambdaMyCouncil",
+    "dead-letter-target-arn" : "arn:aws:sqs:eu-west-1:898823515462:EmailCheckerDLQ",
+    "tracing-mode"           : "Active",
+    "environment-variables"  : "",
+    "function-description"   : "Check incoming emails for spam / viruses or obscene images",
+    "package-type"           : "Zip",
+    "image-tag"              : ""
+}
