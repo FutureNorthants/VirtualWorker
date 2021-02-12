@@ -22,6 +22,8 @@ using Newtonsoft.Json.Linq;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.Model;
+using Amazon.Lex;
+using Amazon.Lex.Model;
 
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]
 
@@ -44,6 +46,8 @@ namespace CheckForLocation
         private static String postCodeURL;
         private static String caseTable;
         private static String sovereignEmailTable;
+        private static String lexAlias = "UAT";
+        private static String originalEmail = "";
         private Boolean liveInstance = false;
 
         private Secrets secrets = null;
@@ -65,9 +69,6 @@ namespace CheckForLocation
                 caseReference = (string)o.SelectToken("CaseReference");
                 taskToken = (string)o.SelectToken("TaskToken");
 
-                String fromStatus = (String)o.SelectToken("FromStatus");
-                String transition = (String)o.SelectToken("Transition");
-
                 Console.WriteLine("caseReference : " + caseReference);
 
                 try
@@ -80,6 +81,7 @@ namespace CheckForLocation
                         postCodeURL = secrets.postcodeURLLive;
                         caseTable = "MailBotCasesLive";
                         sovereignEmailTable = "MailBotCouncilsLive";
+                        lexAlias = "LIVE";
                     }
                 }
                 catch (Exception)
@@ -175,7 +177,9 @@ namespace CheckForLocation
 
                     if (sovereignLocation.Success)
                     {
-                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignLocation.SovereignCouncilName.ToLower(), "default");
+                        originalEmail = await GetContactFromDynamoAsync(caseReference);
+                        String service = await GetIntentFromLexAsync(originalEmail);
+                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignLocation.SovereignCouncilName.ToLower(), service);
                         UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
                         await TransitionCaseAsync("close-case");
                         String emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
@@ -192,6 +196,7 @@ namespace CheckForLocation
                             Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
                             success = false;
                         }
+                       
                         emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-forward.txt");
                         if (!String.IsNullOrEmpty(emailBody))
                         {
@@ -283,7 +288,7 @@ namespace CheckForLocation
                     emailBody = reader.ReadToEnd();
                 }
                 emailBody = emailBody.Replace("AAA", caseReference);
-                emailBody = emailBody.Replace("FFF", HttpUtility.HtmlEncode(await GetContactFromDynamoAsync(caseReference)));
+                emailBody = emailBody.Replace("FFF", HttpUtility.HtmlEncode(originalEmail));
                 emailBody = emailBody.Replace("KKK", caseDetails.customerEmail);
             }
             catch (Exception error)
@@ -318,7 +323,7 @@ namespace CheckForLocation
                         MessageAttributes.Add("To", messageTypeAttribute2);
                         MessageAttributeValue messageTypeAttribute3 = new MessageAttributeValue();
                         messageTypeAttribute3.DataType = "String";
-                        messageTypeAttribute3.StringValue = "Northampton Borough Council: Your Call Number is " + caseReference;
+                        messageTypeAttribute3.StringValue = emailSubject;
                         MessageAttributes.Add("Subject", messageTypeAttribute3);
                         sendMessageRequest.MessageAttributes = MessageAttributes;
                         SendMessageResponse sendMessageResponse = await amazonSQSClient.SendMessageAsync(sendMessageRequest);
@@ -500,7 +505,33 @@ namespace CheckForLocation
                 Console.WriteLine(error.StackTrace);
                 return "";
             }
+        }
 
+        private async Task<string> GetIntentFromLexAsync(String customerContact)
+        {
+            try
+            {
+                AmazonLexClient lexClient = new AmazonLexClient(primaryRegion);
+                PostTextRequest textRequest = new PostTextRequest();
+                textRequest.UserId = "MailBot";
+                textRequest.BotAlias = lexAlias;
+                textRequest.BotName = "UnitaryServices";
+                textRequest.InputText = customerContact;
+                PostTextResponse textResponse = await lexClient.PostTextAsync(textRequest);
+                HttpStatusCode temp = textResponse.HttpStatusCode;
+                String intentName = textResponse.IntentName;
+                if (String.IsNullOrEmpty(intentName))
+                {
+                    intentName = "default";
+                }
+                return intentName;
+            }
+            catch (Exception error)
+            {
+                await SendFailureAsync("Getting Intent", error.Message);
+                Console.WriteLine("ERROR : GetIntentFromLexAsync : " + error.StackTrace);
+                return "GeneralEnquiries";
+            }
         }
 
         private async Task<String> GetSovereignEmailFromDynamoAsync(String sovereignName, String service)
