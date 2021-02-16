@@ -48,6 +48,7 @@ namespace CheckForLocation
         private static String sovereignEmailTable;
         private static String lexAlias = "UAT";
         private static String originalEmail = "";
+        private static String myAccountEndPoint;
         private Boolean liveInstance = false;
 
         private Secrets secrets = null;
@@ -61,6 +62,7 @@ namespace CheckForLocation
                 templateBucket = secrets.templateBucketTest;
                 sqsEmailURL = secrets.sqsEmailURLTest;
                 postCodeURL = secrets.postcodeURLTest;
+                myAccountEndPoint = secrets.myAccountEndPointTest;
 
                 caseTable = "MailBotCasesTest";
                 sovereignEmailTable = "MailBotCouncilsTest";
@@ -82,6 +84,7 @@ namespace CheckForLocation
                         caseTable = "MailBotCasesLive";
                         sovereignEmailTable = "MailBotCouncilsLive";
                         lexAlias = "LIVE";
+                        myAccountEndPoint = secrets.myAccountEndPointLive;
                     }
                 }
                 catch (Exception)
@@ -179,7 +182,17 @@ namespace CheckForLocation
                     {
                         originalEmail = await GetContactFromDynamoAsync(caseReference);
                         String service = await GetIntentFromLexAsync(originalEmail);
-                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignLocation.SovereignCouncilName.ToLower(), service);
+                        String sovereignCouncilName = sovereignLocation.SovereignCouncilName.ToLower();
+                        if (service.ToLower().Contains("_"))
+                        {
+                            if (service.ToLower().Split('_')[0].Equals("county")||
+                                service.ToLower().Split('_')[0].Equals("unitary"))
+                            {
+                                sovereignCouncilName = service.ToLower().Split('_')[0];
+                            }
+                            service = service.Split('_')[1];
+                        } 
+                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName,service);
                         UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
                         await TransitionCaseAsync("close-case");
                         String emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
@@ -200,7 +213,12 @@ namespace CheckForLocation
                         emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-forward.txt");
                         if (!String.IsNullOrEmpty(emailBody))
                         {
-                            if (!await SendMessageAsync("Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails, supporessResponse))
+                            String subjectPrefix = "";
+                            if (!liveInstance)
+                            {
+                                subjectPrefix = "(" + sovereignCouncilName + "-" + service + ") ";
+                            }
+                            if (!await SendMessageAsync(subjectPrefix + "Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails, supporessResponse))
                             {
                                 success = false;
                             }
@@ -523,6 +541,7 @@ namespace CheckForLocation
                 if (String.IsNullOrEmpty(intentName))
                 {
                     intentName = "default";
+                    await SendToTrello(caseReference,secrets.trelloBoardTrainingLabelUnitaryService,secrets.trelloBoardTrainingLabelAWSLexUnitary);
                 }
                 return intentName;
             }
@@ -536,8 +555,7 @@ namespace CheckForLocation
 
         private async Task<String> GetSovereignEmailFromDynamoAsync(String sovereignName, String service)
         {
-
-            try
+          try
             {
                 AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);
                 GetItemRequest request = new GetItemRequest
@@ -562,7 +580,45 @@ namespace CheckForLocation
                 Console.WriteLine(error.StackTrace);
                 return "";
             }
+        }
 
+        private async Task<Boolean> SendToTrello(String caseReference, String fieldLabel, String techLabel)
+        {
+            try
+            {
+                HttpClient cxmClient = new HttpClient();
+                cxmClient.BaseAddress = new Uri("https://api.trello.com");
+                String requestParameters = "key=" + secrets.trelloAPIKey;
+                requestParameters += "&token=" + secrets.trelloAPIToken;
+                requestParameters += "&idList=" + secrets.trelloBoardTrainingListPending;
+                requestParameters += "&name=" + caseReference + " - No Unitary Service Found";             
+                requestParameters += "&desc=**[Full Case Details](" + myAccountEndPoint + "/q/case/" + caseReference + "/timeline)**";
+                requestParameters += "&pos=" + "bottom";
+                requestParameters += "&idLabels=" + fieldLabel + "," + techLabel;
+                HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "1/cards?" + requestParameters);
+                try
+                {
+                    HttpResponseMessage response = cxmClient.SendAsync(request).Result;
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        await SendFailureAsync("Getting case details for " + caseReference, response.StatusCode.ToString());
+                        Console.WriteLine(caseReference + " : ERROR : GetStaffResponseAsync : " + request.ToString());
+                        Console.WriteLine(caseReference + " : ERROR : GetStaffResponseAsync : " + response.StatusCode.ToString());
+                    }
+                }
+                catch (Exception error)
+                {
+                    await SendFailureAsync("SentToTrello : " + caseReference, error.Message);
+                    Console.WriteLine(caseReference + " : ERROR : SentToTrello : " + error.StackTrace);
+                }
+                return false;
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine(caseReference + " : ERROR : Creating Trello Card : " + error.Message);
+                Console.WriteLine(error.StackTrace);
+                return false;
+            }
         }
 
         private async Task SendSuccessAsync()
@@ -631,6 +687,13 @@ namespace CheckForLocation
         public String templateBucketLive { get; set; }
         public String postcodeURLLive { get; set; }
         public String postcodeURLTest { get; set; }
+        public String trelloAPIKey { get; set; }
+        public String trelloAPIToken { get; set; }
+        public String trelloBoardTrainingListPending { get; set; }
+        public String myAccountEndPointLive { get; set; }
+        public String myAccountEndPointTest { get; set; }
+        public String trelloBoardTrainingLabelAWSLexUnitary { get; set; }
+        public String trelloBoardTrainingLabelUnitaryService { get; set; }
     }
 
     public class Location
