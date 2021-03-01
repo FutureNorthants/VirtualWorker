@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EmailChecker", "EmailChecke
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CheckForLocation", "CheckForLocation\CheckForLocation.csproj", "{B3C35471-E2FA-48B5-83CA-0B73B458200C}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FAQProcessor", "FAQProcessor\FAQProcessor\FAQProcessor.csproj", "{66138F79-24DD-4934-B2CE-671EFA74CD75}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{B3C35471-E2FA-48B5-83CA-0B73B458200C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B3C35471-E2FA-48B5-83CA-0B73B458200C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B3C35471-E2FA-48B5-83CA-0B73B458200C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{66138F79-24DD-4934-B2CE-671EFA74CD75}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{66138F79-24DD-4934-B2CE-671EFA74CD75}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{66138F79-24DD-4934-B2CE-671EFA74CD75}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{66138F79-24DD-4934-B2CE-671EFA74CD75}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

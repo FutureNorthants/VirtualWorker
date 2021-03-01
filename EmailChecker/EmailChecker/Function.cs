@@ -50,7 +50,9 @@ namespace EmailChecker
                     var response = await this.S3Client.GetObjectMetadataAsync(s3Event.Bucket.Name, s3Event.Object.Key);
                     AmazonSQSClient amazonSQSClient = new AmazonSQSClient();
                     ProcessEmail emailProcessor = new ProcessEmail();
-                    if (emailProcessor.Process(s3Event.Bucket.Name, s3Event.Object.Key))
+                    Console.WriteLine("Image Moderation Confidence Parameter = " + secrets.imageModerationConfidence);
+                    long imageModerationLevel = long.Parse(secrets.imageModerationConfidence);
+                    if (emailProcessor.Process(s3Event.Bucket.Name, s3Event.Object.Key, imageModerationLevel))
                     {
                         String sqsFAQURL = secrets.sqsFAQURLbeta;
                         try
@@ -65,6 +67,7 @@ namespace EmailChecker
                         {
                             Console.WriteLine("Beta version");
                         }
+                        
                         SendMessageRequest sendMessageRequest = new SendMessageRequest
                         {
                             QueueUrl = sqsFAQURL
@@ -89,6 +92,21 @@ namespace EmailChecker
                             StringValue = s3Event.Object.Key
                         };
                         MessageAttributes.Add("Object", messageTypeAttribute3);
+                        String unitaryCouncil = "";
+                        if (emailProcessor.west)
+                        {
+                            unitaryCouncil = "west";
+                        }
+                        else
+                        {
+                            unitaryCouncil = "north";
+                        }
+                        MessageAttributeValue messageTypeAttribute4 = new MessageAttributeValue
+                        {
+                            DataType = "String",
+                            StringValue = unitaryCouncil
+                        };
+                        MessageAttributes.Add("UnitaryCouncil", messageTypeAttribute4);
                         sendMessageRequest.MessageAttributes = MessageAttributes;
                         SendMessageResponse sendMessageResponse = await amazonSQSClient.SendMessageAsync(sendMessageRequest);
                         return "{\"Message\":\"Email passed checks\",\"lambdaResult\":\"Success\"}";
@@ -163,8 +181,9 @@ namespace EmailChecker
 
     public class Secrets
     {
-        public string sqsFAQURLbeta { get; set; }
-        public string sqsFAQURLprod { get; set; }
-        public string sqsEmailURL { get; set; }
+        public String sqsFAQURLbeta { get; set; }
+        public String sqsFAQURLprod { get; set; }
+        public String sqsEmailURL { get; set; }
+        public String imageModerationConfidence { get; set; }
     }
 }

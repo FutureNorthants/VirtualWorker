@@ -23,18 +23,19 @@ namespace EmailChecker.Helpers
         public String subject { get; set; } = null;
         public String name { get; set; } = null;
         public String emailBody { get; set; } = null;
+        public Boolean west = true;
 
         public ProcessEmail()
         {
             client = new AmazonS3Client(bucketRegion);
         }
 
-        public Boolean Process(String bucketName, String keyName)
+        public Boolean Process(String bucketName, String keyName, float confidence)
         {
-            return ReadObjectDataAsync(bucketName, keyName).Result;
+            return ReadObjectDataAsync(bucketName, keyName, confidence).Result;
         }
 
-        private async Task<Boolean> ReadObjectDataAsync(String bucketName, String keyName)
+        private async Task<Boolean> ReadObjectDataAsync(String bucketName, String keyName, float confidence)
         {
             try
             {
@@ -47,7 +48,17 @@ namespace EmailChecker.Helpers
                 {
                     MimeMessage message = MimeMessage.Load(response.ResponseStream);
                     MailAddressCollection mailAddresses = (MailAddressCollection)message.From;
+                    MailAddressCollection sendToAddresses = (MailAddressCollection)message.To;
                     emailTo = mailAddresses[0].Address;
+                    if (sendToAddresses[0].ToString().ToLower().Contains("northnorthants"))
+                    {
+                        west = false;
+                        Console.WriteLine("Processing email for North Northants from : " + emailTo);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Processing email for West Northants from  : " + emailTo);
+                    }
                     subject = message.Subject;
                     name = message.From[0].Name;
                     int numOfAttachments = 0;
@@ -108,22 +119,19 @@ namespace EmailChecker.Helpers
                                 try
                                 {
                                     DetectModerationLabelsResponse detectModerationLabelsResponse = await rekognitionClient.DetectModerationLabelsAsync(detectModerationLabelsRequest);
-                                    Console.WriteLine("Detected labels for " + "EMA000146-image.jpg");
+                                    Console.WriteLine("Detected labels");
                                     foreach (ModerationLabel label in detectModerationLabelsResponse.ModerationLabels)
                                     {
                                         if (!String.IsNullOrEmpty(label.ParentName))
                                         {
-                                            Console.WriteLine("Label: {0}\n Confidence: {1}\n Parent: {2}",
+                                            Console.WriteLine("Found - Label: {0}\n Confidence: {1}\n Parent: {2}",
                                             label.Name, label.Confidence, label.ParentName);
-                                            switch (label.Name)
+                                            if (label.Confidence > confidence)
                                             {
-                                                case "Female Swimwear Or Underwear":
-                                                    imageCheckPass = false;
-                                                    break;
-                                                default:
-                                                    Console.WriteLine("Error : Unknown label for '" + fileName + "' : " + label.Name);
-                                                    break;
+                                                Console.WriteLine("Rejected - Label: {0}\n Confidence: {1}", label.Name, label.Confidence);
+                                                imageCheckPass = false;
                                             }
+                                           
                                             try
                                             {
                                                 if (imageCheckPass)

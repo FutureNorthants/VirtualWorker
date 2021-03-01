@@ -50,6 +50,7 @@ namespace CheckForLocation
         private static String originalEmail = "";
         private static String myAccountEndPoint;
         private Boolean liveInstance = false;
+        private Boolean district = true;
 
         private Secrets secrets = null;
 
@@ -183,16 +184,11 @@ namespace CheckForLocation
                         originalEmail = await GetContactFromDynamoAsync(caseReference);
                         String service = await GetIntentFromLexAsync(originalEmail);
                         String sovereignCouncilName = sovereignLocation.SovereignCouncilName.ToLower();
-                        if (service.ToLower().Contains("_"))
-                        {
-                            if (service.ToLower().Split('_')[0].Equals("county")||
-                                service.ToLower().Split('_')[0].Equals("unitary"))
-                            {
-                                sovereignCouncilName = service.ToLower().Split('_')[0];
-                            }
-                            service = service.Split('_')[1];
-                        } 
                         String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName,service);
+                        if (String.IsNullOrEmpty(forwardingEmailAddress))
+                        {
+                            forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, "default");
+                        }
                         UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
                         await TransitionCaseAsync("close-case");
                         String emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
@@ -401,7 +397,7 @@ namespace CheckForLocation
                 sovereignLocation.SovereignCouncilName = "Northampton";
                 sovereignLocation.Success = true;
             } else
-            if (emailBody.ToLower().Contains("towcester"))
+            if (emailBody.ToLower().Contains("towcester")||emailBody.ToLower().Contains("cogenhoe"))
             {
                 sovereignLocation.SovereignCouncilName = "south_northants";
                 sovereignLocation.Success = true;
@@ -469,9 +465,24 @@ namespace CheckForLocation
 
         private Boolean UpdateCase(String fieldName, String fieldValue)
         {
+            if (fieldName.Equals("sovereign-service-area"))
+            {
+                if (fieldValue.ToLower().Equals("waste"))
+                {
+                    if (district)
+                    {
+                        fieldValue = "districtwaste";
+                    }
+                    else
+                    {
+                        fieldValue = "countywaste";
+                    }
+                }
+            }
+
             Boolean success = true;
 
-            String data = "{\"" + fieldName + "\":\"" + fieldValue + "\"" +
+            String data = "{\"" + fieldName + "\":\"" + fieldValue.ToLower() + "\"" +
                           "}";
 
             Console.WriteLine($"PATCH payload : " + data);
@@ -542,6 +553,19 @@ namespace CheckForLocation
                 {
                     intentName = "default";
                     await SendToTrello(caseReference,secrets.trelloBoardTrainingLabelUnitaryService,secrets.trelloBoardTrainingLabelAWSLexUnitary);
+                    UpdateCase("sovereign-service-area", "notfound");
+                }
+                else
+                {
+                    if (intentName.ToLower().Contains("county"))
+                    {
+                        district = false;
+                    }
+                    if (intentName.ToLower().Contains("_"))
+                    {
+                        intentName = intentName.Split('_')[1];
+                        UpdateCase("sovereign-service-area", intentName);
+                    }
                 }
                 return intentName;
             }
@@ -571,7 +595,12 @@ namespace CheckForLocation
                 Dictionary<String,AttributeValue> attributeMap = response.Item; 
                 AttributeValue sovereignEmailAttribute;
                 attributeMap.TryGetValue("email", out sovereignEmailAttribute);
-                String sovereignEmail = sovereignEmailAttribute.S;
+                String sovereignEmail="";
+                try
+                {
+                    sovereignEmail = sovereignEmailAttribute.S;
+                }
+                catch(Exception){}
                 return sovereignEmail;
             }
             catch (Exception error)
