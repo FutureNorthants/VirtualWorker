@@ -446,7 +446,17 @@ namespace CheckForLocation
                     JObject caseSearch = JObject.Parse(responseString);
                     try
                     {
-                        return (String)caseSearch.SelectToken("sovereign");
+                        String returnString = (String)caseSearch.SelectToken("sovereign");
+                        if(returnString.ToLower().Equals("south northants"))
+                        {
+                            returnString= "south_northants";
+                        }
+                        if (returnString.ToLower().Equals("east northants"))
+                        {
+                            returnString = "east_northants";
+                        }
+
+                        return returnString;
                     }
                     catch (Exception) { }
                 }
