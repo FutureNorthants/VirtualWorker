@@ -423,11 +423,33 @@ namespace Email2CXM.Helpers
                                 }
                             }
 
+                            String attachmentBucketName = "";
+                            if (west)
+                            {
+                                if (liveInstance)
+                                {
+                                    attachmentBucketName = secrets.wncAttachmentBucketLive;
+                                }
+                                else
+                                {
+                                    attachmentBucketName = secrets.wncAttachmentBucketTest;
+                                }
+                            }
+                            else
+                            {
+                                if (liveInstance)
+                                {
+                                    attachmentBucketName = secrets.nncAttachmentBucketLive;
+                                }
+                                else
+                                {
+                                    attachmentBucketName = secrets.nncAttachmentBucketTest;
+                                }
+                            }
 
                             Console.WriteLine($"responseFileName {responseFileName}");
-
                             ProcessAttachments attachmentProcessor = new ProcessAttachments();
-                            attachmentProcessor.Process(caseReference, message, client, liveInstance);
+                            attachmentProcessor.Process(caseReference, message, client, attachmentBucketName);
                             await StoreAttachmentCountToDynamoAsync(caseReference, attachmentProcessor.numOfAttachments);
                         }
                     }
@@ -626,5 +648,9 @@ namespace Email2CXM.Helpers
         public String botPersona2 { get; set; }
         public String loopPreventIdentifier { get; set; }
         public String sigParseKey { get; set; }
+        public String wncAttachmentBucketLive { get; set; }
+        public String wncAttachmentBucketTest { get; set; }
+        public String nncAttachmentBucketLive { get; set; }
+        public String nncAttachmentBucketTest { get; set; }
     }
 }

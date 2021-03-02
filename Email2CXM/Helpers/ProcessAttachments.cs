@@ -11,13 +11,13 @@ namespace Email2CXM.Helpers
     {
         public int numOfAttachments;
 
-        public Boolean Process(String caseRef, MimeMessage message, IAmazonS3 client, Boolean liveInstance)
+        public Boolean Process(String caseRef, MimeMessage message, IAmazonS3 client, String bucketName)
         {
             numOfAttachments = 0;
-            return ProcessAsync(caseRef, message, client, liveInstance).Result;
+            return ProcessAsync(caseRef, message, client, bucketName).Result;
         }
 
-        private async Task<Boolean> ProcessAsync(String caseRef, MimeMessage message, IAmazonS3 client, Boolean liveInstance)
+        private async Task<Boolean> ProcessAsync(String caseRef, MimeMessage message, IAmazonS3 client, String bucketName)
         {
             int currentBodyPart = 1;
             foreach (MimeEntity bodyPart in message.BodyParts)
@@ -27,32 +27,25 @@ namespace Email2CXM.Helpers
                 {
                     numOfAttachments++;
                     MimePart part = (MimePart)bodyPart;
-                    await SaveAttachment(caseRef, message, currentBodyPart, part, client, liveInstance);
+                    Console.WriteLine(caseRef + " : Processing Attachment " + numOfAttachments);
+                    await SaveAttachment(caseRef, message, currentBodyPart, part, client, bucketName);
                 }
             }
 
             return true;
         }
 
-        private async Task<Boolean> SaveAttachment(String caseRef, MimeMessage message, int currentAttachment, MimePart part, IAmazonS3 client, Boolean liveInstance)
+        private async Task<Boolean> SaveAttachment(String caseRef, MimeMessage message, int currentAttachment, MimePart part, IAmazonS3 client, String bucketName)
         {
             String fileName = caseRef + "-" + currentAttachment + "-" + part.FileName;
             try
             {
+                Console.WriteLine(caseRef + " : Writing Attachment : " + fileName + " : to : "  + bucketName);
                 currentAttachment++;
                 Stream objectStream = new MemoryStream();
                 part.Content.DecodeTo(objectStream);
                 byte[] attachmentArray = new byte[objectStream.Length];
                 long attachmentLength = objectStream.Length;
-                String bucketName = "";
-                if (liveInstance)
-                {
-                    bucketName = "nbc-email-attachments.live";
-                }
-                else
-                {
-                    bucketName = "nbc-email-attachments.test";
-                }
                 using (Stream imageStream = part.Content.Open())
                 {
                     PutObjectRequest putRequest = new PutObjectRequest()
