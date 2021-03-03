@@ -145,6 +145,18 @@ namespace EmailChecker.Helpers
                                                 }
                                                 else
                                                 {
+                                                    try
+                                                    {
+                                                        DeleteObjectRequest clearRequest = new DeleteObjectRequest
+                                                        {
+                                                            BucketName = "nbc-quarantined-image",
+                                                            Key = fileName
+                                                        };
+                                                        await client.DeleteObjectAsync(clearRequest);
+                                                    }
+                                                    catch(Exception error)
+                                                    {
+                                                    }
                                                     CopyObjectRequest copyRequest = new CopyObjectRequest
                                                     {
                                                         SourceBucket = "nbc-pending-images",
