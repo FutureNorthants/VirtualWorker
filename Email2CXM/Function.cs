@@ -14,9 +14,6 @@ namespace Email2CXM
 
         public async Task FunctionHandler(SQSEvent evnt, ILambdaContext context)
         {
-            //String killSwitch = Environment.GetEnvironmentVariable("killSwitch");
-           // String sigParseKey = Environment.GetEnvironmentVariable("sigParseKey");
-            String tableName = "MailBotCasesTest";
             Boolean liveInstance = false;
 
             try
@@ -24,7 +21,6 @@ namespace Email2CXM
                 if (context.InvokedFunctionArn.ToLower().Contains("prod"))
                 {
                     Console.WriteLine(">>>Prod Case<<<");
-                    tableName = "MailBotCasesLive";
                     liveInstance = true;
                 }
                 else
@@ -39,19 +35,18 @@ namespace Email2CXM
 
             foreach (SQSMessage message in evnt.Records)
             {
-                await ProcessMessageAsync(message, tableName, liveInstance);
+                await ProcessMessageAsync(message, liveInstance);
             }
         }
 
-        private async Task ProcessMessageAsync(SQSEvent.SQSMessage message, String tableName, Boolean liveInstance)
+        private async Task ProcessMessageAsync(SQSEvent.SQSMessage message, Boolean liveInstance)
         {
             message.MessageAttributes.TryGetValue("Bucket", out MessageAttribute messageBucket);
             message.MessageAttributes.TryGetValue("Object", out MessageAttribute messageObject);
-            //message.MessageAttributes.TryGetValue("UnitaryCouncil", out MessageAttribute messageUnitary);
 
             ProcessMessage messageProcessor = new ProcessMessage();
 
-            messageProcessor.Process(messageBucket.StringValue, messageObject.StringValue, tableName, liveInstance);
+            messageProcessor.Process(messageBucket.StringValue, messageObject.StringValue, liveInstance);
 
             await Task.CompletedTask;
         }

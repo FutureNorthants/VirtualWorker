@@ -58,9 +58,8 @@ namespace Email2CXM.Helpers
             client = new AmazonS3Client(bucketRegion);
         }
 
-        public Boolean Process(String bucketName, String keyName, String inputTableName, Boolean liveInstance)
+        public Boolean Process(String bucketName, String keyName, Boolean liveInstance)
         {
-            tableName = inputTableName;
             return ReadObjectDataAsync(bucketName, keyName, liveInstance).Result;
         }
 
@@ -136,6 +135,7 @@ namespace Email2CXM.Helpers
                                 cxmAPIKey = secrets.cxmAPIKeyLive;
                                 cxmAPIName = secrets.cxmAPINameWest;
                                 cxmAPICaseType = secrets.cxmAPICaseTypeWest;
+                                tableName = secrets.wncEMACasesLive;
                             }
                             else
                             {
@@ -143,6 +143,7 @@ namespace Email2CXM.Helpers
                                 cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
                                 cxmAPIName = secrets.cxmAPINameNorth;
                                 cxmAPICaseType = secrets.cxmAPICaseTypeNorth;
+                                tableName = secrets.nncEMNCasesLive;
                             }
 
                         }
@@ -154,6 +155,7 @@ namespace Email2CXM.Helpers
                                 cxmAPIKey = secrets.cxmAPIKeyTest;
                                 cxmAPIName = secrets.cxmAPINameWest;
                                 cxmAPICaseType = secrets.cxmAPICaseTypeWest;
+                                tableName = secrets.wncEMACasesTest;
                             }
                             else
                             {
@@ -161,6 +163,7 @@ namespace Email2CXM.Helpers
                                 cxmAPIKey = secrets.cxmAPIKeyTestNorth;
                                 cxmAPIName = secrets.cxmAPINameNorth;
                                 cxmAPICaseType = secrets.cxmAPICaseTypeNorth;
+                                tableName = secrets.nncEMNCasesTest;
                             }
 
                         }
@@ -652,5 +655,9 @@ namespace Email2CXM.Helpers
         public String wncAttachmentBucketTest { get; set; }
         public String nncAttachmentBucketLive { get; set; }
         public String nncAttachmentBucketTest { get; set; }
+        public string wncEMACasesLive { get; set; }
+        public string wncEMACasesTest { get; set; }
+        public string nncEMNCasesLive { get; set; }
+        public string nncEMNCasesTest { get; set; }
     }
 }
