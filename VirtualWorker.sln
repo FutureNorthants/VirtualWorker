@@ -13,6 +13,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UploadFile2CXM", "UploadFil
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PutInitialContact", "PutInitialContact\PutInitialContact.csproj", "{610EB7FA-9D7D-409A-AC34-A16ACBADEFB5}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GetService", "GetService\GetService.csproj", "{9FCA52A9-6E29-4150-B3D5-7FC434BAEBD3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{610EB7FA-9D7D-409A-AC34-A16ACBADEFB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{610EB7FA-9D7D-409A-AC34-A16ACBADEFB5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{610EB7FA-9D7D-409A-AC34-A16ACBADEFB5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FCA52A9-6E29-4150-B3D5-7FC434BAEBD3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FCA52A9-6E29-4150-B3D5-7FC434BAEBD3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FCA52A9-6E29-4150-B3D5-7FC434BAEBD3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FCA52A9-6E29-4150-B3D5-7FC434BAEBD3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
