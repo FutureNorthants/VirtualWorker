@@ -655,9 +655,9 @@ namespace Email2CXM.Helpers
         public String wncAttachmentBucketTest { get; set; }
         public String nncAttachmentBucketLive { get; set; }
         public String nncAttachmentBucketTest { get; set; }
-        public string wncEMACasesLive { get; set; }
-        public string wncEMACasesTest { get; set; }
-        public string nncEMNCasesLive { get; set; }
-        public string nncEMNCasesTest { get; set; }
+        public String wncEMACasesLive { get; set; }
+        public String wncEMACasesTest { get; set; }
+        public String nncEMNCasesLive { get; set; }
+        public String nncEMNCasesTest { get; set; }
     }
 }

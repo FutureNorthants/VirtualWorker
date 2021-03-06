@@ -46,9 +46,10 @@ namespace CheckForLocation
         private static String postCodeURL;
         private static String caseTable;
         private static String sovereignEmailTable;
-        private static String lexAlias = "UAT";
+        private static String lexAlias;
         private static String originalEmail = "";
         private static String myAccountEndPoint;
+        private static String cxmAPIName;
         private Boolean liveInstance = false;
         private Boolean district = true;
 
@@ -65,9 +66,6 @@ namespace CheckForLocation
                 postCodeURL = secrets.postcodeURLTest;
                 myAccountEndPoint = secrets.myAccountEndPointTest;
 
-                caseTable = "MailBotCasesTest";
-                sovereignEmailTable = "MailBotCouncilsTest";
-
                 JObject o = JObject.Parse(input.ToString());
                 caseReference = (string)o.SelectToken("CaseReference");
                 taskToken = (string)o.SelectToken("TaskToken");
@@ -79,31 +77,67 @@ namespace CheckForLocation
                     if (context.InvokedFunctionArn.ToLower().Contains("prod"))
                     {
                         liveInstance = true;
-                        templateBucket = secrets.templateBucketLive;
-                        sqsEmailURL = secrets.sqsEmailURLLive;
-                        postCodeURL = secrets.postcodeURLLive;
-                        caseTable = "MailBotCasesLive";
-                        sovereignEmailTable = "MailBotCouncilsLive";
-                        lexAlias = "LIVE";
-                        myAccountEndPoint = secrets.myAccountEndPointLive;
                     }
                 }
                 catch (Exception)
-                {
-                }
+                {}
 
                 if (liveInstance)
                 {
-                    cxmEndPoint = secrets.cxmEndPointLive;
-                    cxmAPIKey = secrets.cxmAPIKeyLive;
+                    sqsEmailURL = secrets.sqsEmailURLLive;
+                    postCodeURL = secrets.postcodeURLLive;
+                    lexAlias = "LIVE";
+                    myAccountEndPoint = secrets.myAccountEndPointLive;
+                    if (caseReference.ToLower().Contains("ema"))
+                    {
+                        caseTable = secrets.wncEMACasesLive;
+                        sovereignEmailTable = secrets.wncEMACasesLive;
+                        cxmEndPoint = secrets.cxmEndPointLive;
+                        cxmAPIKey = secrets.cxmAPIKeyLive;
+                        templateBucket = secrets.templateBucketLive;
+                        cxmAPIName = secrets.cxmAPINameWest;
+                    }
+                    if (caseReference.ToLower().Contains("emn"))
+                    {
+                        caseTable = secrets.nncEMNCasesLive;
+                        sovereignEmailTable = secrets.nncEMNCasesLive;
+                        cxmEndPoint = secrets.cxmEndPointLiveNorth;
+                        cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
+                        templateBucket = secrets.templateBucketLive;
+                        cxmAPIName = secrets.cxmAPINameNorth;
+                    }
                     CaseDetails caseDetailsLive = await GetCaseDetailsAsync();
                     await ProcessCaseAsync(caseDetailsLive, suppressResponse);
                     await SendSuccessAsync();
+                   
                 }
                 else
                 {
                     cxmEndPoint = secrets.cxmEndPointTest;
                     cxmAPIKey = secrets.cxmAPIKeyTest;
+                    templateBucket = secrets.templateBucketTest;
+                    sqsEmailURL = secrets.sqsEmailURLTest;
+                    postCodeURL = secrets.postcodeURLTest;
+                    lexAlias = "UAT";
+                    myAccountEndPoint = secrets.myAccountEndPointLive;
+                    if (caseReference.ToLower().Contains("ema"))
+                    {
+                        caseTable = secrets.wncEMACasesTest;
+                        sovereignEmailTable = secrets.wncEMACasesTest;
+                        cxmEndPoint = secrets.cxmEndPointTest;
+                        cxmAPIKey = secrets.cxmAPIKeyTest;
+                        templateBucket = secrets.templateBucketTest;
+                        cxmAPIName = secrets.cxmAPINameWest;
+                    }
+                    if (caseReference.ToLower().Contains("emn"))
+                    {
+                        caseTable = secrets.nncEMNCasesTest;
+                        sovereignEmailTable = secrets.nncEMNCasesTest;
+                        cxmEndPoint = secrets.cxmEndPointTestNorth;
+                        cxmAPIKey = secrets.cxmAPIKeyTestNorth;
+                        templateBucket = secrets.templateBucketTest;
+                        cxmAPIName = secrets.cxmAPINameNorth;
+                    }
                     CaseDetails caseDetailsTest = await GetCaseDetailsAsync();
                     await ProcessCaseAsync(caseDetailsTest, suppressResponse);
                     await SendSuccessAsync();
@@ -141,7 +175,7 @@ namespace CheckForLocation
             HttpClient cxmClient = new HttpClient();
             cxmClient.BaseAddress = new Uri(cxmEndPoint);
             string requestParameters = "key=" + cxmAPIKey;
-            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "/api/service-api/norbert/case/" + caseReference + "?" + requestParameters);
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "?" + requestParameters);
             try
             {
                 HttpResponseMessage response = cxmClient.SendAsync(request).Result;
@@ -151,7 +185,14 @@ namespace CheckForLocation
                     String responseString = responseContent.ReadAsStringAsync().Result;
                     JObject caseSearch = JObject.Parse(responseString);
                     caseDetails.customerName = (String)caseSearch.SelectToken("values.first-name") + " " + (String)caseSearch.SelectToken("values.surname");
-                    caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email");
+                    if (caseReference.ToLower().Contains("ema"))
+                    {
+                        caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email");
+                    }
+                    if (caseReference.ToLower().Contains("emn"))
+                    {
+                        caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
+                    }
                     caseDetails.enquiryDetails = (String)caseSearch.SelectToken("values.enquiry_details");
                     caseDetails.customerHasUpdated = (Boolean)caseSearch.SelectToken("values.customer_has_updated");
                 }
@@ -270,7 +311,7 @@ namespace CheckForLocation
             HttpClient cxmClient = new HttpClient();
             cxmClient.BaseAddress = new Uri(cxmEndPoint);
             string requestParameters = "key=" + cxmAPIKey;
-            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "/api/service-api/norbert/case/" + caseReference + "/transition/" + transitionTo + "?" + requestParameters);
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "/transition/" + transitionTo + "?" + requestParameters);
             HttpResponseMessage response = cxmClient.SendAsync(request).Result;
             if (response.IsSuccessStatusCode)
             {
@@ -497,7 +538,7 @@ namespace CheckForLocation
 
             Console.WriteLine($"PATCH payload : " + data);
 
-            String url = cxmEndPoint + "/api/service-api/norbert/case/" + caseReference + "/edit?key=" + cxmAPIKey;
+            String url = cxmEndPoint + "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "/edit?key=" + cxmAPIKey;
             Encoding encoding = Encoding.Default;
             HttpWebRequest patchRequest = (HttpWebRequest)WebRequest.Create(url);
             patchRequest.Method = "PATCH";
@@ -733,6 +774,18 @@ namespace CheckForLocation
         public String myAccountEndPointTest { get; set; }
         public String trelloBoardTrainingLabelAWSLexUnitary { get; set; }
         public String trelloBoardTrainingLabelUnitaryService { get; set; }
+        public String wncEMACasesLive { get; set; }
+        public String wncEMACasesTest { get; set; }
+        public String nncEMNCasesLive { get; set; }
+        public String nncEMNCasesTest { get; set; }
+        public String cxmEndPointTestNorth { get; set; }
+        public String cxmEndPointLiveNorth { get; set; }
+        public String cxmAPIKeyTestNorth { get; set; }
+        public String cxmAPIKeyLiveNorth { get; set; }
+        public String cxmAPINameNorth { get; set; }
+        public String cxmAPINameWest { get; set; }
+        public String cxmAPICaseTypeNorth { get; set; }
+        public String cxmAPICaseTypeWest { get; set; }
     }
 
     public class Location

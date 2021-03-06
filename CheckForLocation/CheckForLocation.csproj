@@ -14,7 +14,7 @@
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.5.4.32" />
     <PackageReference Include="AWSSDK.Lex" Version="3.5.1.34" />
     <PackageReference Include="AWSSDK.S3" Version="3.5.9.1" />
-    <PackageReference Include="AWSSDK.SecretsManager" Version="3.5.0.73" />
+    <PackageReference Include="AWSSDK.SecretsManager" Version="3.5.1" />
     <PackageReference Include="AWSSDK.SQS" Version="3.5.1.22" />
     <PackageReference Include="AWSSDK.StepFunctions" Version="3.5.3.31" />
     <PackageReference Include="System.Net.Http.Json" Version="5.0.0" />
