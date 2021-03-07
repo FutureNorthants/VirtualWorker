@@ -50,6 +50,7 @@ namespace CheckForLocation
         private static String originalEmail = "";
         private static String myAccountEndPoint;
         private static String cxmAPIName;
+        private static String orgName;
         private Boolean liveInstance = false;
         private Boolean district = true;
 
@@ -129,6 +130,7 @@ namespace CheckForLocation
                         cxmAPIKey = secrets.cxmAPIKeyTest;
                         templateBucket = secrets.templateBucketTest;
                         cxmAPIName = secrets.cxmAPINameWest;
+                        orgName = secrets.wncOrgName;
                     }
                     if (caseReference.ToLower().Contains("emn"))
                     {
@@ -138,6 +140,7 @@ namespace CheckForLocation
                         cxmAPIKey = secrets.cxmAPIKeyTestNorth;
                         templateBucket = secrets.templateBucketTest;
                         cxmAPIName = secrets.cxmAPINameNorth;
+                        orgName = secrets.nncOrgName;
                     }
                     CaseDetails caseDetailsTest = await GetCaseDetailsAsync();
                     await ProcessCaseAsync(caseDetailsTest, suppressResponse);
@@ -236,7 +239,7 @@ namespace CheckForLocation
                         String emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
                         if (!String.IsNullOrEmpty(emailBody))
                         {
-                            if (!await SendMessageAsync("Northampton Borough Council: Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails, supporessResponse))
+                            if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails, supporessResponse))
                             {
                                 success = false;
                             }
@@ -279,7 +282,7 @@ namespace CheckForLocation
                             String emailBody = await FormatEmailAsync(caseDetails, "email-location-request.txt");
                             if (!String.IsNullOrEmpty(emailBody))
                             {
-                                if (!await SendMessageAsync("Northampton Borough Council: Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails, supporessResponse))
+                                if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails, supporessResponse))
                                 {
                                     success = false;
                                 }
@@ -787,6 +790,10 @@ namespace CheckForLocation
         public String cxmAPINameWest { get; set; }
         public String cxmAPICaseTypeNorth { get; set; }
         public String cxmAPICaseTypeWest { get; set; }
+        public String organisationName { get; set; }
+        public String wncOrgName { get; set; }
+        public String nncOrgName { get; set; }
+
     }
 
     public class Location
