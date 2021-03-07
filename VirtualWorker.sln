@@ -15,6 +15,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PutInitialContact", "PutIni
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GetService", "GetService\GetService.csproj", "{9FCA52A9-6E29-4150-B3D5-7FC434BAEBD3}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GetFAQResponse", "GetFAQResponse\GetFAQResponse.csproj", "{CE0F9B82-C0A3-4C0A-B5E7-9FC5FBE6343A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,10 @@ Global
 		{9FCA52A9-6E29-4150-B3D5-7FC434BAEBD3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9FCA52A9-6E29-4150-B3D5-7FC434BAEBD3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9FCA52A9-6E29-4150-B3D5-7FC434BAEBD3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE0F9B82-C0A3-4C0A-B5E7-9FC5FBE6343A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE0F9B82-C0A3-4C0A-B5E7-9FC5FBE6343A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE0F9B82-C0A3-4C0A-B5E7-9FC5FBE6343A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE0F9B82-C0A3-4C0A-B5E7-9FC5FBE6343A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

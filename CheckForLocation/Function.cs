@@ -91,6 +91,7 @@ namespace CheckForLocation
                     if (caseReference.ToLower().Contains("ema"))
                     {
                         caseTable = secrets.wncEMACasesLive;
+                        //TODO!
                         sovereignEmailTable = secrets.wncEMACasesLive;
                         cxmEndPoint = secrets.cxmEndPointLive;
                         cxmAPIKey = secrets.cxmAPIKeyLive;

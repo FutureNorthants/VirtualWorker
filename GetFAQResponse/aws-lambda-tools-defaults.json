@@ -1,0 +1,23 @@
+
+{
+    "Information" : [
+        "This file provides default values for the deployment wizard inside Visual Studio and the AWS Lambda commands added to the .NET Core CLI.",
+        "To learn more about the Lambda commands with the .NET Core CLI execute the following command at the command line in the project root directory.",
+        "dotnet lambda help",
+        "All the command line options for the Lambda command can be specified in this file."
+    ],
+    "profile"     : "NBC",
+    "region"      : "eu-west-2",
+    "configuration" : "Release",
+    "framework"     : "netcoreapp3.1",
+    "function-runtime" : "dotnetcore3.1",
+    "function-memory-size" : 256,
+    "function-timeout"     : 30,
+    "function-handler"     : "GetFAQResponse::GetFAQResponse.Function::FunctionHandler",
+    "function-name"        : "GetFAQResponse",
+    "function-description" : "Step Function : Get response from QNA service if above confidence level",
+    "package-type"         : "Zip",
+    "tracing-mode"         : "PassThrough",
+    "environment-variables" : "\"minAutoRespondLevel\"=\"80\";\"instance\"=\"test\";\"qnaURL\"=\"https://nbcwebservice.azurewebsites.net/qnamaker/knowledgebases/9e0449aa-e598-4c5f-a848-de61d123f91e/generateAnswer\";\"qnaAuthorization\"=\"EndpointKey d77cb979-073f-4427-8d10-c672fec9e5cd\";\"minConfidenceLevel\"=\"50\"",
+    "image-tag"             : ""
+}
