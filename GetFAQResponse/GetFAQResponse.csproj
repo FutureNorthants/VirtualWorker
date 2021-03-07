@@ -11,8 +11,8 @@
     <PackageReference Include="Amazon.Lambda.Core" Version="1.2.0" />
     <PackageReference Include="Amazon.Lambda.Serialization.Json" Version="1.8.0" />
     <PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" Version="2.1.0" />
-    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.5.4.32" />
-    <PackageReference Include="AWSSDK.SecretsManager" Version="3.5.1" />
-    <PackageReference Include="AWSSDK.StepFunctions" Version="3.5.3.31" />
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.5.4.34" />
+    <PackageReference Include="AWSSDK.SecretsManager" Version="3.5.1.2" />
+    <PackageReference Include="AWSSDK.StepFunctions" Version="3.5.3.33" />
   </ItemGroup>
 </Project>
