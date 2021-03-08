@@ -105,7 +105,7 @@ namespace CheckForLocation
                         sovereignEmailTable = secrets.nncEMNCasesLive;
                         cxmEndPoint = secrets.cxmEndPointLiveNorth;
                         cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
-                        templateBucket = secrets.templateBucketLive;
+                        templateBucket = secrets.nncTemplateBucketLive;
                         cxmAPIName = secrets.cxmAPINameNorth;
                     }
                     CaseDetails caseDetailsLive = await GetCaseDetailsAsync();
@@ -138,7 +138,7 @@ namespace CheckForLocation
                         sovereignEmailTable = secrets.nncEMNCasesTest;
                         cxmEndPoint = secrets.cxmEndPointTestNorth;
                         cxmAPIKey = secrets.cxmAPIKeyTestNorth;
-                        templateBucket = secrets.templateBucketTest;
+                        templateBucket = secrets.nncTemplateBucketTest;
                         cxmAPIName = secrets.cxmAPINameNorth;
                         orgName = secrets.nncOrgName;
                     }
@@ -793,7 +793,8 @@ namespace CheckForLocation
         public String organisationName { get; set; }
         public String wncOrgName { get; set; }
         public String nncOrgName { get; set; }
-
+        public String nncTemplateBucketLive { get; set; }
+        public String nncTemplateBucketTest { get; set; }
     }
 
     public class Location
