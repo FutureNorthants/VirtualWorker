@@ -92,8 +92,7 @@ namespace CheckForLocation
                     if (caseReference.ToLower().Contains("ema"))
                     {
                         caseTable = secrets.wncEMACasesLive;
-                        //TODO!
-                        sovereignEmailTable = secrets.wncEMACasesLive;
+                        sovereignEmailTable = "MailBotCouncilsLive";
                         cxmEndPoint = secrets.cxmEndPointLive;
                         cxmAPIKey = secrets.cxmAPIKeyLive;
                         templateBucket = secrets.templateBucketLive;
@@ -102,7 +101,7 @@ namespace CheckForLocation
                     if (caseReference.ToLower().Contains("emn"))
                     {
                         caseTable = secrets.nncEMNCasesLive;
-                        sovereignEmailTable = secrets.nncEMNCasesLive;
+                        sovereignEmailTable = "MailBotCouncilsLive";
                         cxmEndPoint = secrets.cxmEndPointLiveNorth;
                         cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
                         templateBucket = secrets.nncTemplateBucketLive;
@@ -125,7 +124,7 @@ namespace CheckForLocation
                     if (caseReference.ToLower().Contains("ema"))
                     {
                         caseTable = secrets.wncEMACasesTest;
-                        sovereignEmailTable = secrets.wncEMACasesTest;
+                        sovereignEmailTable = "MailBotCouncilsTest";
                         cxmEndPoint = secrets.cxmEndPointTest;
                         cxmAPIKey = secrets.cxmAPIKeyTest;
                         templateBucket = secrets.templateBucketTest;
@@ -135,7 +134,7 @@ namespace CheckForLocation
                     if (caseReference.ToLower().Contains("emn"))
                     {
                         caseTable = secrets.nncEMNCasesTest;
-                        sovereignEmailTable = secrets.nncEMNCasesTest;
+                        sovereignEmailTable = "MailBotCouncilsTest";
                         cxmEndPoint = secrets.cxmEndPointTestNorth;
                         cxmAPIKey = secrets.cxmAPIKeyTestNorth;
                         templateBucket = secrets.nncTemplateBucketTest;
