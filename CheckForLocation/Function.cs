@@ -228,6 +228,11 @@ namespace CheckForLocation
                         originalEmail = await GetContactFromDynamoAsync(caseReference);
                         String service = await GetIntentFromLexAsync(originalEmail);
                         String sovereignCouncilName = sovereignLocation.SovereignCouncilName.ToLower();
+                        if(!district)
+                        {
+                            sovereignCouncilName = "county";
+                            sovereignLocation.SovereignCouncilName = "northamptonshire";
+                        }
                         String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName,service);
                         if (String.IsNullOrEmpty(forwardingEmailAddress))
                         {
@@ -641,7 +646,7 @@ namespace CheckForLocation
                     TableName = sovereignEmailTable,
                     Key = new Dictionary<string, AttributeValue>() {
                                                                     { "name", new AttributeValue { S = sovereignName } },
-                                                                    { "service", new AttributeValue { S = service } }
+                                                                    { "service", new AttributeValue { S = service.ToLower() } }
                                                                    }
                 };
                 GetItemResponse response = await dynamoDBClient.GetItemAsync(request);
