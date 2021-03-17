@@ -10,9 +10,9 @@
   <ItemGroup>
     <PackageReference Include="Amazon.Lambda.Core" Version="1.2.0" />
     <PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" Version="2.1.0" />
-    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.5.4.34" />
-    <PackageReference Include="AWSSDK.Lex" Version="3.5.1.36" />
-    <PackageReference Include="AWSSDK.SecretsManager" Version="3.5.1.2" />
-    <PackageReference Include="AWSSDK.StepFunctions" Version="3.5.3.33" />
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.5.4.36" />
+    <PackageReference Include="AWSSDK.Lex" Version="3.5.1.38" />
+    <PackageReference Include="AWSSDK.SecretsManager" Version="3.5.1.4" />
+    <PackageReference Include="AWSSDK.StepFunctions" Version="3.5.3.35" />
   </ItemGroup>
 </Project>
