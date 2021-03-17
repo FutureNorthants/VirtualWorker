@@ -19,6 +19,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GetFAQResponse", "GetFAQRes
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SendEmail", "SendEmail\SendEmail.csproj", "{79FA7090-2157-4353-A46E-B758901DA136}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UnitaryForward", "UnitaryForward\UnitaryForward.csproj", "{33CFD171-DBD2-470A-AA1F-E880592417EF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,6 +59,10 @@ Global
 		{79FA7090-2157-4353-A46E-B758901DA136}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{79FA7090-2157-4353-A46E-B758901DA136}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{79FA7090-2157-4353-A46E-B758901DA136}.Release|Any CPU.Build.0 = Release|Any CPU
+		{33CFD171-DBD2-470A-AA1F-E880592417EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{33CFD171-DBD2-470A-AA1F-E880592417EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{33CFD171-DBD2-470A-AA1F-E880592417EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{33CFD171-DBD2-470A-AA1F-E880592417EF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
