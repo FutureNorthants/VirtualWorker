@@ -53,6 +53,7 @@ namespace CheckForLocation
         private static String orgName;
         private Boolean liveInstance = false;
         private Boolean district = true;
+        private Boolean west = true;
 
         private Secrets secrets = null;
 
@@ -100,6 +101,7 @@ namespace CheckForLocation
                     }
                     if (caseReference.ToLower().Contains("emn"))
                     {
+                        west = false;
                         caseTable = secrets.nncEMNCasesLive;
                         sovereignEmailTable = "MailBotCouncilsLive";
                         cxmEndPoint = secrets.cxmEndPointLiveNorth;
@@ -133,6 +135,7 @@ namespace CheckForLocation
                     }
                     if (caseReference.ToLower().Contains("emn"))
                     {
+                        west = false;
                         caseTable = secrets.nncEMNCasesTest;
                         sovereignEmailTable = "MailBotCouncilsTest";
                         cxmEndPoint = secrets.cxmEndPointTestNorth;
@@ -223,22 +226,25 @@ namespace CheckForLocation
                 {
                     Location sovereignLocation = await CheckForLocationAsync(caseDetails.enquiryDetails);
 
+                    originalEmail = await GetContactFromDynamoAsync(caseReference);
+                    String service = await GetIntentFromLexAsync(originalEmail);
+
                     if (sovereignLocation.Success)
                     {
-                        originalEmail = await GetContactFromDynamoAsync(caseReference);
-                        String service = await GetIntentFromLexAsync(originalEmail);
+                        Console.WriteLine(caseReference + " : Location Found");                      
                         String sovereignCouncilName = sovereignLocation.SovereignCouncilName.ToLower();
-                        if(!district)
+                        if (!district)
                         {
                             sovereignCouncilName = "county";
                             sovereignLocation.SovereignCouncilName = "northamptonshire";
                         }
-                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName,service);
+                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, service);
                         if (String.IsNullOrEmpty(forwardingEmailAddress))
                         {
                             forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, "default");
                         }
                         UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
+
                         await TransitionCaseAsync("close-case");
                         String emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
                         if (!String.IsNullOrEmpty(emailBody))
@@ -263,7 +269,7 @@ namespace CheckForLocation
                             {
                                 subjectPrefix = "(" + sovereignCouncilName + "-" + service + ") ";
                             }
-                            if (!await SendMessageAsync(subjectPrefix + "Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails, supporessResponse))
+                            if (!await SendMessageAsync(subjectPrefix + "TEST - Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails, supporessResponse))
                             {
                                 success = false;
                             }
@@ -277,9 +283,21 @@ namespace CheckForLocation
                     }
                     else
                     {
+                        Console.WriteLine(caseReference + " : Location Not Found");
+                        Console.WriteLine(caseReference + " : Customer Has Updated : " + caseDetails.customerHasUpdated);
                         if (caseDetails.customerHasUpdated)
                         {
-                            await TransitionCaseAsync("unitary-awaiting-review");
+                            if (west)
+                            {
+                                Console.WriteLine(caseReference + " : West Transition");
+                                await TransitionCaseAsync("unitary-awaiting-review");
+                            }
+                            else
+                            {
+                                Console.WriteLine(caseReference + " : North Transition");
+                                await TransitionCaseAsync("hub-awaiting-review");
+                            }
+                            
                         }
                         else
                         {
