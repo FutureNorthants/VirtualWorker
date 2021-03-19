@@ -51,6 +51,7 @@ namespace CheckForLocation
         private static String myAccountEndPoint;
         private static String cxmAPIName;
         private static String orgName;
+        private static String nncSovereignEmailTable;
         private Boolean liveInstance = false;
         private Boolean district = true;
         private Boolean west = true;
@@ -61,7 +62,7 @@ namespace CheckForLocation
         {
             if (await GetSecrets())
             {
-                Boolean suppressResponse = false;
+                //Boolean suppressResponse = false;
 
                 templateBucket = secrets.templateBucketTest;
                 sqsEmailURL = secrets.sqsEmailURLTest;
@@ -108,11 +109,8 @@ namespace CheckForLocation
                         cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
                         templateBucket = secrets.nncTemplateBucketLive;
                         cxmAPIName = secrets.cxmAPINameNorth;
-                    }
-                    CaseDetails caseDetailsLive = await GetCaseDetailsAsync();
-                    await ProcessCaseAsync(caseDetailsLive, suppressResponse);
-                    await SendSuccessAsync();
-                   
+                        nncSovereignEmailTable = secrets.nncSovereignEmailTableLive;
+                    }              
                 }
                 else
                 {
@@ -143,11 +141,12 @@ namespace CheckForLocation
                         templateBucket = secrets.nncTemplateBucketTest;
                         cxmAPIName = secrets.cxmAPINameNorth;
                         orgName = secrets.nncOrgName;
+                        nncSovereignEmailTable = secrets.nncSovereignEmailTableTest;
                     }
-                    CaseDetails caseDetailsTest = await GetCaseDetailsAsync();
-                    await ProcessCaseAsync(caseDetailsTest, suppressResponse);
-                    await SendSuccessAsync();
                 }
+                CaseDetails caseDetails = await GetCaseDetailsAsync();
+                await ProcessCaseAsync(caseDetails);
+                await SendSuccessAsync();
             }
             Console.WriteLine("Completed");
         }
@@ -191,6 +190,16 @@ namespace CheckForLocation
                     String responseString = responseContent.ReadAsStringAsync().Result;
                     JObject caseSearch = JObject.Parse(responseString);
                     caseDetails.customerName = (String)caseSearch.SelectToken("values.first-name") + " " + (String)caseSearch.SelectToken("values.surname");
+                    try
+                    {
+                        caseDetails.manualReview = (Boolean)caseSearch.SelectToken("values.manual_review");
+                    }
+                    catch (Exception) { }
+                    try
+                    {
+                        caseDetails.forward = (String)caseSearch.SelectToken("values.emn_fwd_to_sovereign_council");                    
+                    }
+                    catch (Exception) { }
                     if (caseReference.ToLower().Contains("ema"))
                     {
                         caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email");
@@ -217,39 +226,23 @@ namespace CheckForLocation
             return caseDetails;
         }
 
-        private async Task<Boolean> ProcessCaseAsync(CaseDetails caseDetails, Boolean supporessResponse)
+        private async Task<Boolean> ProcessCaseAsync(CaseDetails caseDetails)
         {
             Boolean success = true;
             try
             {
                 if (!String.IsNullOrEmpty(caseDetails.enquiryDetails))
                 {
-                    Location sovereignLocation = await CheckForLocationAsync(caseDetails.enquiryDetails);
 
                     originalEmail = await GetContactFromDynamoAsync(caseReference);
-                    String service = await GetIntentFromLexAsync(originalEmail);
-
-                    if (sovereignLocation.Success)
+                    if (caseDetails.manualReview)
                     {
-                        Console.WriteLine(caseReference + " : Location Found");                      
-                        String sovereignCouncilName = sovereignLocation.SovereignCouncilName.ToLower();
-                        if (!district)
-                        {
-                            sovereignCouncilName = "county";
-                            sovereignLocation.SovereignCouncilName = "northamptonshire";
-                        }
-                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, service);
-                        if (String.IsNullOrEmpty(forwardingEmailAddress))
-                        {
-                            forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, "default");
-                        }
-                        UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
-
+                        String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
                         await TransitionCaseAsync("close-case");
                         String emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
                         if (!String.IsNullOrEmpty(emailBody))
                         {
-                            if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails, supporessResponse))
+                            if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails))
                             {
                                 success = false;
                             }
@@ -260,16 +253,16 @@ namespace CheckForLocation
                             Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
                             success = false;
                         }
-                       
+
                         emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-forward.txt");
                         if (!String.IsNullOrEmpty(emailBody))
                         {
                             String subjectPrefix = "";
                             if (!liveInstance)
                             {
-                                subjectPrefix = "(" + sovereignCouncilName + "-" + service + ") ";
+                                subjectPrefix = "(" + caseDetails.forward + ") ";
                             }
-                            if (!await SendMessageAsync(subjectPrefix + "TEST - Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails, supporessResponse))
+                            if (!await SendMessageAsync(subjectPrefix + "TEST - Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails))
                             {
                                 success = false;
                             }
@@ -283,28 +276,50 @@ namespace CheckForLocation
                     }
                     else
                     {
-                        Console.WriteLine(caseReference + " : Location Not Found");
-                        Console.WriteLine(caseReference + " : Customer Has Updated : " + caseDetails.customerHasUpdated);
-                        if (caseDetails.customerHasUpdated)
+                        Location sovereignLocation = await CheckForLocationAsync(caseDetails.enquiryDetails);
+                        String service = await GetIntentFromLexAsync(originalEmail);
+
+                        if (sovereignLocation.Success)
                         {
-                            if (west)
+                            Console.WriteLine(caseReference + " : Location Found");
+                            String sovereignCouncilName = sovereignLocation.SovereignCouncilName.ToLower();
+                            if (!district)
                             {
-                                Console.WriteLine(caseReference + " : West Transition");
-                                await TransitionCaseAsync("unitary-awaiting-review");
+                                sovereignCouncilName = "county";
+                                sovereignLocation.SovereignCouncilName = "northamptonshire";
+                            }
+                            String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, service);
+                            if (String.IsNullOrEmpty(forwardingEmailAddress))
+                            {
+                                forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, "default");
+                            }
+                            UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
+
+                            await TransitionCaseAsync("close-case");
+                            String emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
+                            if (!String.IsNullOrEmpty(emailBody))
+                            {
+                                if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails))
+                                {
+                                    success = false;
+                                }
                             }
                             else
                             {
-                                Console.WriteLine(caseReference + " : North Transition");
-                                await TransitionCaseAsync("hub-awaiting-review");
+                                await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
+                                Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
+                                success = false;
                             }
-                            
-                        }
-                        else
-                        {
-                            String emailBody = await FormatEmailAsync(caseDetails, "email-location-request.txt");
+
+                            emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-forward.txt");
                             if (!String.IsNullOrEmpty(emailBody))
                             {
-                                if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails, supporessResponse))
+                                String subjectPrefix = "";
+                                if (!liveInstance)
+                                {
+                                    subjectPrefix = "(" + sovereignCouncilName + "-" + service + ") ";
+                                }
+                                if (!await SendMessageAsync(subjectPrefix + "TEST - Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails))
                                 {
                                     success = false;
                                 }
@@ -316,7 +331,45 @@ namespace CheckForLocation
                                 success = false;
                             }
                         }
-                    }
+                        else
+                        {
+                            Console.WriteLine(caseReference + " : Location Not Found");
+                            Console.WriteLine(caseReference + " : Customer Has Updated : " + caseDetails.customerHasUpdated);
+                            if (caseDetails.customerHasUpdated)
+                            {
+                                if (west)
+                                {
+                                    Console.WriteLine(caseReference + " : West Transition");
+                                    await TransitionCaseAsync("unitary-awaiting-review");
+                                }
+                                else
+                                {
+                                    Console.WriteLine(caseReference + " : North Transition");
+                                    await TransitionCaseAsync("hub-awaiting-review");
+                                }
+
+                            }
+                            else
+                            {
+                                String emailBody = await FormatEmailAsync(caseDetails, "email-location-request.txt");
+                                if (!String.IsNullOrEmpty(emailBody))
+                                {
+                                    if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails))
+                                    {
+                                        success = false;
+                                    }
+                                }
+                                else
+                                {
+                                    await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
+                                    Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
+                                    success = false;
+                                }
+                            }
+                        }
+                    }                  
+
+ 
 
                 }
                 else
@@ -381,10 +434,8 @@ namespace CheckForLocation
             return emailBody;
         }
 
-        private async Task<Boolean> SendMessageAsync(String emailSubject, String emailTo, String emailBody, CaseDetails caseDetails, Boolean suppressResponse)
+        private async Task<Boolean> SendMessageAsync(String emailSubject, String emailTo, String emailBody, CaseDetails caseDetails)
         {
-            if (!suppressResponse)
-            {
                 try
                 {
                     AmazonSQSClient amazonSQSClient = new AmazonSQSClient(sqsRegion);
@@ -424,7 +475,6 @@ namespace CheckForLocation
                     Console.WriteLine("ERROR : SendMessageAsync : " + error.StackTrace);
                     return false;
                 }
-            }
             return true;
         }
 
@@ -540,7 +590,15 @@ namespace CheckForLocation
             return null;
         }
 
-        private Boolean UpdateCase(String fieldName, String fieldValue)
+        private async Task<Location> SetLocationAsync(String emailBody)
+        {
+            Location sovereignLocation = new Location();
+            sovereignLocation.Success = false;
+            sovereignLocation.SovereignCouncilName = "";
+            return sovereignLocation;
+        }
+
+            private Boolean UpdateCase(String fieldName, String fieldValue)
         {
             if (fieldName.Equals("sovereign-service-area"))
             {
@@ -688,6 +746,39 @@ namespace CheckForLocation
             }
         }
 
+        private async Task<String> NNCGetSovereignEmailFromDynamoAsync(String sovereignName)
+        {
+            try
+            {
+                AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);
+                GetItemRequest request = new GetItemRequest
+                {
+                    TableName = nncSovereignEmailTable,
+                    Key = new Dictionary<string, AttributeValue>() {
+                                                                    { "name", new AttributeValue { S = sovereignName }  }
+                                                                   }
+                };
+                GetItemResponse response = await dynamoDBClient.GetItemAsync(request);
+
+                Dictionary<String, AttributeValue> attributeMap = response.Item;
+                AttributeValue sovereignEmailAttribute;
+                attributeMap.TryGetValue("email", out sovereignEmailAttribute);
+                String sovereignEmail = "";
+                try
+                {
+                    sovereignEmail = sovereignEmailAttribute.S;
+                }
+                catch (Exception) { }
+                return sovereignEmail;
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine("ERROR : NNCGetSovereignEmailFromDynamoAsync : " + error.Message);
+                Console.WriteLine(error.StackTrace);
+                return "";
+            }
+        }
+
         private async Task<Boolean> SendToTrello(String caseReference, String fieldLabel, String techLabel)
         {
             try
@@ -778,7 +869,9 @@ namespace CheckForLocation
         public String customerName { get; set; } = "";
         public String customerEmail { get; set; } = "";
         public String enquiryDetails { get; set; } = "";
+        public String forward { get; set; } = "";
         public Boolean customerHasUpdated { get; set; } = false;
+        public Boolean manualReview { get; set; } = false;
     }
 
     public class Secrets
@@ -817,6 +910,8 @@ namespace CheckForLocation
         public String nncOrgName { get; set; }
         public String nncTemplateBucketLive { get; set; }
         public String nncTemplateBucketTest { get; set; }
+        public String nncSovereignEmailTableLive { get; set; }
+        public String nncSovereignEmailTableTest { get; set; }
     }
 
     public class Location
