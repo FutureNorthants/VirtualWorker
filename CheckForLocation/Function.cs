@@ -62,8 +62,6 @@ namespace CheckForLocation
         {
             if (await GetSecrets())
             {
-                //Boolean suppressResponse = false;
-
                 templateBucket = secrets.templateBucketTest;
                 sqsEmailURL = secrets.sqsEmailURLTest;
                 postCodeURL = secrets.postcodeURLTest;
@@ -210,6 +208,9 @@ namespace CheckForLocation
                     }
                     caseDetails.enquiryDetails = (String)caseSearch.SelectToken("values.enquiry_details");
                     caseDetails.customerHasUpdated = (Boolean)caseSearch.SelectToken("values.customer_has_updated");
+                    caseDetails.sovereignCouncil = GetStringValueFromJSON(caseSearch, "values.sovereign_council");
+                    caseDetails.sovereignServiceArea = GetStringValueFromJSON(caseSearch, "values.sovereign_service_area");
+                    caseDetails.fullEmail = GetStringValueFromJSON(caseSearch, "values.original_email");
                 }
                 else
                 {
@@ -235,44 +236,20 @@ namespace CheckForLocation
                 {
 
                     originalEmail = await GetContactFromDynamoAsync(caseReference);
-                    if (caseDetails.manualReview)
+                    if (caseDetails.manualReview&&west)
+                    {
+                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil,caseDetails.sovereignServiceArea);
+                        if (String.IsNullOrEmpty(forwardingEmailAddress))
+                        {
+                            forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
+                        }
+                        success = await SendEmails(caseDetails, forwardingEmailAddress);
+                        caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
+                    }
+                    else if(caseDetails.manualReview)
                     {
                         String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
-                        await TransitionCaseAsync("close-case");
-                        String emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
-                        if (!String.IsNullOrEmpty(emailBody))
-                        {
-                            if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails))
-                            {
-                                success = false;
-                            }
-                        }
-                        else
-                        {
-                            await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
-                            Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
-                            success = false;
-                        }
-
-                        emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-forward.txt");
-                        if (!String.IsNullOrEmpty(emailBody))
-                        {
-                            String subjectPrefix = "";
-                            if (!liveInstance)
-                            {
-                                subjectPrefix = "(" + caseDetails.forward + ") ";
-                            }
-                            if (!await SendMessageAsync(subjectPrefix + "TEST - Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails))
-                            {
-                                success = false;
-                            }
-                        }
-                        else
-                        {
-                            await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
-                            Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
-                            success = false;
-                        }
+                        success = await SendEmails(caseDetails,forwardingEmailAddress);
                     }
                     else
                     {
@@ -294,42 +271,7 @@ namespace CheckForLocation
                                 forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, "default");
                             }
                             UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
-
-                            await TransitionCaseAsync("close-case");
-                            String emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
-                            if (!String.IsNullOrEmpty(emailBody))
-                            {
-                                if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails))
-                                {
-                                    success = false;
-                                }
-                            }
-                            else
-                            {
-                                await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
-                                Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
-                                success = false;
-                            }
-
-                            emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-forward.txt");
-                            if (!String.IsNullOrEmpty(emailBody))
-                            {
-                                String subjectPrefix = "";
-                                if (!liveInstance)
-                                {
-                                    subjectPrefix = "(" + sovereignCouncilName + "-" + service + ") ";
-                                }
-                                if (!await SendMessageAsync(subjectPrefix + "TEST - Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails))
-                                {
-                                    success = false;
-                                }
-                            }
-                            else
-                            {
-                                await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
-                                Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
-                                success = false;
-                            }
+                            success = await SendEmails(caseDetails, forwardingEmailAddress);
                         }
                         else
                         {
@@ -424,6 +366,7 @@ namespace CheckForLocation
                 emailBody = emailBody.Replace("AAA", caseReference);
                 emailBody = emailBody.Replace("FFF", HttpUtility.HtmlEncode(originalEmail));
                 emailBody = emailBody.Replace("KKK", caseDetails.customerEmail);
+                emailBody = emailBody.Replace("OOO", HttpUtility.HtmlEncode(caseDetails.fullEmail));
             }
             catch (Exception error)
             {
@@ -590,7 +533,7 @@ namespace CheckForLocation
             return null;
         }
 
-        private async Task<Location> SetLocationAsync(String emailBody)
+        private Location SetLocationAsync(String emailBody)
         {
             Location sovereignLocation = new Location();
             sovereignLocation.Success = false;
@@ -779,6 +722,57 @@ namespace CheckForLocation
             }
         }
 
+        private String GetStringValueFromJSON(JObject json, String fieldName)
+        {
+            String returnValue = "";
+            try
+            {
+                returnValue = (String)json.SelectToken(fieldName);
+            }
+            catch (Exception) { }
+            return returnValue;
+        }
+
+        private async Task<Boolean> SendEmails(CaseDetails caseDetails, String forwardingEmailAddress)
+        {
+            await TransitionCaseAsync("close-case");
+            String emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
+            if (!String.IsNullOrEmpty(emailBody))
+            {
+                if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
+                Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
+                return false;
+            }
+
+            emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-forward.txt");
+            if (!String.IsNullOrEmpty(emailBody))
+            {
+                String subjectPrefix = "";
+                if (!liveInstance)
+                {
+                    subjectPrefix = "(" + caseDetails.forward + ") TEST - ";
+                }
+                if (!await SendMessageAsync(subjectPrefix + "Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
+                Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
+                return false;
+            }
+            return true;
+        }
+
         private async Task<Boolean> SendToTrello(String caseReference, String fieldLabel, String techLabel)
         {
             try
@@ -869,7 +863,10 @@ namespace CheckForLocation
         public String customerName { get; set; } = "";
         public String customerEmail { get; set; } = "";
         public String enquiryDetails { get; set; } = "";
+        public String fullEmail { get; set; } = "";
         public String forward { get; set; } = "";
+        public String sovereignCouncil { get; set; } = "";
+        public String sovereignServiceArea { get; set; } = "";
         public Boolean customerHasUpdated { get; set; } = false;
         public Boolean manualReview { get; set; } = false;
     }
