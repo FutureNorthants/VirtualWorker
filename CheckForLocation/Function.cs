@@ -205,6 +205,7 @@ namespace CheckForLocation
                     if (caseReference.ToLower().Contains("emn"))
                     {
                         caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
+                        caseDetails.nncForwardEMailTo = GetStringValueFromJSON(caseSearch, "values.forward_email_to");
                     }
                     caseDetails.enquiryDetails = (String)caseSearch.SelectToken("values.enquiry_details");
                     caseDetails.customerHasUpdated = (Boolean)caseSearch.SelectToken("values.customer_has_updated");
@@ -243,13 +244,29 @@ namespace CheckForLocation
                         {
                             forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
                         }
-                        success = await SendEmails(caseDetails, forwardingEmailAddress);
+                        success = await SendEmails(caseDetails, forwardingEmailAddress,true);
                         caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
+                        if(caseDetails.sovereignCouncil.ToLower().Equals("northampton"))
+                        {
+                            await TransitionCaseAsync("awaiting-review");
+                        }
+                        else
+                        {
+                            await TransitionCaseAsync("close-case");
+                        }
                     }
                     else if(caseDetails.manualReview)
                     {
-                        String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
-                        success = await SendEmails(caseDetails,forwardingEmailAddress);
+                        if (!String.IsNullOrEmpty(caseDetails.forward))
+                        {
+                            String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
+                            success = await SendEmails(caseDetails, forwardingEmailAddress, true);
+                        }                      
+                        if (!String.IsNullOrEmpty(caseDetails.nncForwardEMailTo))
+                        {
+                            success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo,false);
+                        }
+                        await TransitionCaseAsync("close-case");
                     }
                     else
                     {
@@ -271,7 +288,15 @@ namespace CheckForLocation
                                 forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, "default");
                             }
                             UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
-                            success = await SendEmails(caseDetails, forwardingEmailAddress);
+                            success = await SendEmails(caseDetails, forwardingEmailAddress,true);
+                            if (sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton"))
+                            {
+                                await TransitionCaseAsync("awaiting-review");
+                            }
+                            else
+                            {
+                                await TransitionCaseAsync("close-case");
+                            }
                         }
                         else
                         {
@@ -733,31 +758,38 @@ namespace CheckForLocation
             return returnValue;
         }
 
-        private async Task<Boolean> SendEmails(CaseDetails caseDetails, String forwardingEmailAddress)
+        private async Task<Boolean> SendEmails(CaseDetails caseDetails, String forwardingEmailAddress, Boolean replyToCustomer)
         {
-            await TransitionCaseAsync("close-case");
-            String emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
-            if (!String.IsNullOrEmpty(emailBody))
+            String emailBody = "";
+            if (replyToCustomer)
             {
-                if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails))
+                emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
+                if (!String.IsNullOrEmpty(emailBody))
                 {
+                    if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails))
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
+                    Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
                     return false;
                 }
             }
-            else
-            {
-                await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
-                Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
-                return false;
-            }
-
+ 
             emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-forward.txt");
             if (!String.IsNullOrEmpty(emailBody))
             {
                 String subjectPrefix = "";
                 if (!liveInstance)
                 {
-                    subjectPrefix = "(" + caseDetails.forward + ") TEST - ";
+                    if (!String.IsNullOrEmpty(caseDetails.forward))
+                    {
+                        subjectPrefix = "(" + caseDetails.forward + ") ";
+                    }
+                    subjectPrefix += "TEST - ";
                 }
                 if (!await SendMessageAsync(subjectPrefix + "Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails))
                 {
@@ -867,6 +899,7 @@ namespace CheckForLocation
         public String forward { get; set; } = "";
         public String sovereignCouncil { get; set; } = "";
         public String sovereignServiceArea { get; set; } = "";
+        public String nncForwardEMailTo { get; set; } = "";
         public Boolean customerHasUpdated { get; set; } = false;
         public Boolean manualReview { get; set; } = false;
     }
