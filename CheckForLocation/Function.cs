@@ -335,9 +335,6 @@ namespace CheckForLocation
                             }
                         }
                     }                  
-
- 
-
                 }
                 else
                 {
@@ -389,9 +386,13 @@ namespace CheckForLocation
                     emailBody = reader.ReadToEnd();
                 }
                 emailBody = emailBody.Replace("AAA", caseReference);
-                emailBody = emailBody.Replace("FFF", HttpUtility.HtmlEncode(originalEmail));
                 emailBody = emailBody.Replace("KKK", caseDetails.customerEmail);
-                emailBody = emailBody.Replace("OOO", HttpUtility.HtmlEncode(caseDetails.fullEmail));
+                String tempDetails = "";
+                if (caseDetails.customerHasUpdated)
+                {
+                    tempDetails = HttpUtility.HtmlEncode(caseDetails.enquiryDetails) + "<BR><BR>";
+                }
+                emailBody = emailBody.Replace("OOO", tempDetails + HttpUtility.HtmlEncode(caseDetails.fullEmail));
             }
             catch (Exception error)
             {
@@ -448,15 +449,18 @@ namespace CheckForLocation
 
         private async Task<Location> CheckForLocationAsync(String emailBody)
         {
-
+            emailBody=emailBody.Replace("\n", " ");
+            emailBody=emailBody.Trim();
             Location sovereignLocation = new Location();
 
-            String[] regArray = new string[2];
+            String[] regArray = new string[4];
 
             regArray[0] = @"^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([AZa-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9][A-Za-z]?)))) [0-9][A-Za-z]{2})$";
             regArray[1] = @"^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([AZa-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9][A-Za-z]?))))[0-9][A-Za-z]{2})$";
+            regArray[2] = @"^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([AZa-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9][A-Za-z]?)))) [0-9][A-Za-z]{2}).";
+            regArray[3] = @"^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([AZa-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9][A-Za-z]?))))[0-9][A-Za-z]{2}).";
 
-            foreach( String regString in regArray)
+            foreach ( String regString in regArray)
             {
                 MatchCollection matches = Regex.Matches(emailBody, regString);
 
@@ -558,15 +562,7 @@ namespace CheckForLocation
             return null;
         }
 
-        private Location SetLocationAsync(String emailBody)
-        {
-            Location sovereignLocation = new Location();
-            sovereignLocation.Success = false;
-            sovereignLocation.SovereignCouncilName = "";
-            return sovereignLocation;
-        }
-
-            private Boolean UpdateCase(String fieldName, String fieldValue)
+        private Boolean UpdateCase(String fieldName, String fieldValue)
         {
             if (fieldName.Equals("sovereign-service-area"))
             {

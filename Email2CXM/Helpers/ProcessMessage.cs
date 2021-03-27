@@ -19,6 +19,7 @@ using Amazon.DynamoDBv2.Model;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
 using System.Linq;
+using HtmlAgilityPack;
 
 namespace Email2CXM.Helpers
 {
@@ -47,9 +48,11 @@ namespace Email2CXM.Helpers
         public String lastName { get; set; } = null;
         public String emailBody { get; set; } = null;
         public String caseReference { get; set; } = null;
+        public String emailContents { get; set; } = null;
 
         public Boolean create = true;
         public Boolean unitary = false;
+        public Boolean contactUs = false;
 
         private Boolean west = true;
 
@@ -83,7 +86,7 @@ namespace Email2CXM.Helpers
                     {
                         emailTo = mailToAddresses[0].Address.ToString().ToLower();
                         emailFrom = mailFromAddresses[0].Address.ToString().ToLower();
-                        Console.WriteLine(emailFrom + " - Processing email sent to this address 2 : " + emailTo);
+                        Console.WriteLine(emailFrom + " - Processing email sent to this address : " + emailTo);
                         if (emailTo.Contains("update"))
                         {
                             Console.WriteLine(emailFrom + " - Update Case");
@@ -93,13 +96,17 @@ namespace Email2CXM.Helpers
                         {
                             Console.WriteLine(emailFrom + " - Create Case");
                         }
-                        if (emailTo.ToLower().Contains("unitary") || emailTo.ToLower().Contains("westnorthants") || emailTo.ToLower().Contains("northnorthants"))
+                        if (emailTo.ToLower().Contains("unitary") || emailTo.ToLower().Contains("westnorthants") || emailTo.ToLower().Contains("northnorthants") || emailFrom.ToLower().Contains("noreply@northamptonshire.gov.uk"))
                         {
                             unitary = true;
                         }
                         if (emailTo.ToLower().Contains("northnorthants"))
                         {
                             west = false;
+                        }
+                        if (emailFrom.ToLower().Contains("noreply@northamptonshire.gov.uk")&&message.Subject.ToLower().Contains("northamptonshire council form has been submitted"))
+                        {
+                            contactUs = true;
                         }
                     }
                     catch (Exception)
@@ -117,6 +124,31 @@ namespace Email2CXM.Helpers
                     lastName = String.Join(" ", names.ToArray());
                     emailBody = message.HtmlBody;
                     Console.WriteLine(emailFrom + " - Email Contents : " + message.TextBody);
+                    if (String.IsNullOrEmpty(message.TextBody))
+                    {
+                        if (String.IsNullOrEmpty(message.HtmlBody))
+                        {
+                            emailContents = getBodyFromBase64(message);
+                        }
+                        else
+                        {
+                            HtmlDocument emailHTML = new HtmlDocument();
+                            emailHTML.LoadHtml(message.HtmlBody);
+                            emailContents =  emailHTML.DocumentNode.InnerText;
+                        }                     
+                        try
+                        {
+                            int emailAddressStarts = emailContents.ToLower().IndexOf("email address:") + 15;
+                            int emailAddressEnds = emailContents.ToLower().IndexOf("telephone number:") - 2;
+                            emailFrom = emailContents.Substring(emailAddressStarts, emailAddressEnds-emailAddressStarts);
+                        }
+                        catch { }
+                    }
+                    else
+                    {
+                        emailContents = message.TextBody;
+                    } 
+
                     String person = "";
                     Boolean bundlerFound = false;
                     String responseFileName = "";
@@ -191,14 +223,12 @@ namespace Email2CXM.Helpers
                             bundlerFound = true;
                         }
                         SigParser.Client sigParserClient = new SigParser.Client(secrets.sigParseKey);
-
-                        String tempEmailContents = message.TextBody;
                         String corporateSignature = await GetSignatureFromDynamoAsync(secrets.homeDomain);
-                        int corporateSignatureLocation = message.TextBody.IndexOf(corporateSignature);
+                        int corporateSignatureLocation = emailContents.IndexOf(corporateSignature);
                         if (corporateSignatureLocation > 0)
                         {
                             Console.WriteLine("Home Domain Corporate Signature Found");
-                            tempEmailContents = tempEmailContents.Remove(corporateSignatureLocation);
+                            emailContents = emailContents.Remove(corporateSignatureLocation);
                         }
                         else
                         {
@@ -209,11 +239,11 @@ namespace Email2CXM.Helpers
                             int domainLocation = mailFromAddresses[currentAddress].Address.IndexOf("@");
                             domainLocation++;
                             corporateSignature = await GetSignatureFromDynamoAsync(mailFromAddresses[currentAddress].Address.Substring(domainLocation));
-                            corporateSignatureLocation = tempEmailContents.IndexOf(corporateSignature);
+                            corporateSignatureLocation = emailContents.IndexOf(corporateSignature);
                             if (corporateSignatureLocation > 0)
                             {
                                 Console.WriteLine("Corporate Signature Found " + currentAddress);
-                                tempEmailContents = tempEmailContents.Remove(corporateSignatureLocation);
+                                emailContents = emailContents.Remove(corporateSignatureLocation);
                             }
                             else
                             {
@@ -221,28 +251,35 @@ namespace Email2CXM.Helpers
                             }
                         }
 
-                        SigParser.EmailParseRequest sigParserRequest = new SigParser.EmailParseRequest { plainbody = tempEmailContents, from_name = firstName + " " + lastName, from_address = emailFrom };
-                        parsedEmailUnencoded = sigParserClient.Parse(sigParserRequest).cleanedemailbody_plain;
-                        var temp = sigParserClient.Parse(sigParserRequest);
-                        if ((parsedEmailUnencoded == null || parsedEmailUnencoded.Contains("___")) && !bundlerFound)
+                        if (contactUs)
                         {
-                            Console.WriteLine($"No message found, checking for forwarded message");
-                            parsedEmailUnencoded = sigParserClient.Parse(sigParserRequest).emails[1].cleanedBodyPlain;
-                            emailFrom = sigParserClient.Parse(sigParserRequest).emails[1].from_EmailAddress;
-                            names = sigParserClient.Parse(sigParserRequest).emails[1].from_Name.Split(' ').ToList();
-                            firstName = names.First();
-                            names.RemoveAt(0);
-                            lastName = String.Join(" ", names.ToArray());
+                            parsedEmailUnencoded = emailContents;
+                            parsedEmailEncoded = HttpUtility.UrlEncode(emailContents);
                         }
-                        Console.WriteLine($"Cleaned email body is : {parsedEmailUnencoded}");
-                        parsedEmailEncoded = HttpUtility.UrlEncode(parsedEmailUnencoded);
-                        Console.WriteLine($"Encoded email body is : {parsedEmailEncoded}");
+                        else 
+                        { 
+                            SigParser.EmailParseRequest sigParserRequest = new SigParser.EmailParseRequest { plainbody = emailContents, from_name = firstName + " " + lastName, from_address = emailFrom };
+                            parsedEmailUnencoded = sigParserClient.Parse(sigParserRequest).cleanedemailbody_plain;
+                            //var temp = sigParserClient.Parse(sigParserRequest);
+                            if ((parsedEmailUnencoded == null || parsedEmailUnencoded.Contains("___")) && !bundlerFound)
+                            {
+                                Console.WriteLine($"No message found, checking for forwarded message");
+                                parsedEmailUnencoded = sigParserClient.Parse(sigParserRequest).emails[1].cleanedBodyPlain;
+                                emailFrom = sigParserClient.Parse(sigParserRequest).emails[1].from_EmailAddress;
+                                names = sigParserClient.Parse(sigParserRequest).emails[1].from_Name.Split(' ').ToList();
+                                firstName = names.First();
+                                names.RemoveAt(0);
+                                lastName = String.Join(" ", names.ToArray());
+                            }
+                            Console.WriteLine($"Cleaned email body is : {parsedEmailUnencoded}");
+                            parsedEmailEncoded = HttpUtility.UrlEncode(parsedEmailUnencoded);
+                            Console.WriteLine($"Encoded email body is : {parsedEmailEncoded}");
+                        }  
                     }
                     catch (Exception error)
                     {
-                        byte[] bytes = Encoding.Default.GetBytes(message.TextBody);
-                        parsedEmailUnencoded = message.TextBody;
-                        parsedEmailEncoded = HttpUtility.UrlEncode(message.TextBody);
+                        parsedEmailUnencoded = emailContents;
+                        parsedEmailEncoded = HttpUtility.UrlEncode(emailContents);
                         Console.WriteLine("ERROR : An Unknown error encountered : {0}' when reading email", error.Message);
                         Console.WriteLine(error.StackTrace);
                     }
@@ -582,6 +619,32 @@ namespace Email2CXM.Helpers
                 return false;
             }
         }
+
+        private String getBodyFromBase64(MimeMessage message)
+        {
+            String content = "";
+            try
+            {
+                foreach (var bodyPart in message.BodyParts)
+                {
+                    MemoryStream memory = new MemoryStream();
+                    MimePart emailBody = (MimePart)bodyPart;
+                    emailBody.Content.DecodeTo(memory);
+                    byte[] memoryArray = memory.ToArray();
+                    String emailBodyString = Encoding.Default.GetString(memoryArray);
+                    HtmlDocument emailHTML = new HtmlDocument();
+                    emailHTML.LoadHtml(emailBodyString);
+                    return emailHTML.DocumentNode.InnerText;
+                }
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine(emailFrom + " - ERROR Email Contents from Base64: " + error.ToString());
+            }
+
+            return content;
+        }
+
 
         private async Task<Boolean> GetSecrets()
         {

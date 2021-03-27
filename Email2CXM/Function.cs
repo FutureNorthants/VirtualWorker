@@ -41,12 +41,26 @@ namespace Email2CXM
 
         private async Task ProcessMessageAsync(SQSEvent.SQSMessage message, Boolean liveInstance)
         {
-            message.MessageAttributes.TryGetValue("Bucket", out MessageAttribute messageBucket);
-            message.MessageAttributes.TryGetValue("Object", out MessageAttribute messageObject);
+            String bucket;
+            String file;
+            try
+            {
+                message.MessageAttributes.TryGetValue("Bucket", out MessageAttribute messageBucket);
+                message.MessageAttributes.TryGetValue("Object", out MessageAttribute messageObject);
+                bucket = messageBucket.StringValue;
+                file = messageObject.StringValue;
+            }
+            catch
+            {
+                //Test Code
+                bucket = "norbert.emails.test";
+                file = "5ogn40bi17htnmqacc8fcc8kntf1lujfk4jrf281";
+            }
+ 
 
             ProcessMessage messageProcessor = new ProcessMessage();
 
-            messageProcessor.Process(messageBucket.StringValue, messageObject.StringValue, liveInstance);
+            messageProcessor.Process(bucket, file, liveInstance);
 
             await Task.CompletedTask;
         }
