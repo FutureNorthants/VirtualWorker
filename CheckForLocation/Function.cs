@@ -396,12 +396,21 @@ namespace CheckForLocation
                 }
                 emailBody = emailBody.Replace("AAA", caseReference);
                 emailBody = emailBody.Replace("KKK", caseDetails.customerEmail);
-                String tempDetails = "";
-                if (caseDetails.customerHasUpdated)
+                emailBody = emailBody.Replace("ZZZ", caseDetails.enquiryDetails);
+               
+                if (String.IsNullOrEmpty(caseDetails.fullEmail))
                 {
-                    tempDetails = HttpUtility.HtmlEncode(caseDetails.enquiryDetails) + "<BR><BR>";
+                    emailBody = emailBody.Replace("OOO", HttpUtility.HtmlEncode(caseDetails.enquiryDetails));
                 }
-                emailBody = emailBody.Replace("OOO", tempDetails + HttpUtility.HtmlEncode(caseDetails.fullEmail));
+                else
+                {
+                    String tempDetails = "";
+                    if (caseDetails.customerHasUpdated)
+                    {
+                        tempDetails = HttpUtility.HtmlEncode(caseDetails.enquiryDetails) + "<BR><BR>";
+                    }
+                    emailBody = emailBody.Replace("OOO", tempDetails + HttpUtility.HtmlEncode(caseDetails.fullEmail));
+                }              
             }
             catch (Exception error)
             {
