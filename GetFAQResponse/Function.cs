@@ -119,16 +119,16 @@ namespace GetFAQResponse
                     {
                         if (caseReference.ToLower().Contains("ema"))
                         {
-                            tableName = secrets.wncEMACasesTest;
-                            cxmEndPoint = secrets.cxmEndPointTest;
-                            cxmAPIKey = secrets.cxmAPIKeyTest;
+                            tableName = secrets.wncEMACasesLive;
+                            cxmEndPoint = secrets.cxmEndPointLive;
+                            cxmAPIKey = secrets.cxmAPIKeyLive;
                             cxmAPIName = secrets.cxmAPINameWest;
                         }
                         if (caseReference.ToLower().Contains("emn"))
                         {
-                            tableName = secrets.nncEMNCasesTest;
-                            cxmEndPoint = secrets.cxmEndPointTestNorth;
-                            cxmAPIKey = secrets.cxmAPIKeyTestNorth;
+                            tableName = secrets.nncEMNCasesLive;
+                            cxmEndPoint = secrets.cxmEndPointLiveNorth;
+                            cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
                             cxmAPIName = secrets.cxmAPINameNorth;
                         }
 
@@ -501,11 +501,15 @@ namespace GetFAQResponse
         public String cxmEndPointLive { get; set; }
         public String cxmAPIKeyTest { get; set; }
         public String cxmAPIKeyLive { get; set; }
+        public String wncEMACasesLive { get; set; }
+        public String nncEMNCasesLive { get; set; }
         public String wncEMACasesTest { get; set; }
         public String nncEMNCasesTest { get; set; }
         public String cxmAPINameWest { get; set; }
         public String cxmEndPointTestNorth { get; set; }
+        public String cxmEndPointLiveNorth { get; set; }
         public String cxmAPIKeyTestNorth { get; set; }
+        public String cxmAPIKeyLiveNorth { get; set; }
         public String cxmAPINameNorth { get; set; }
         public String minAutoResponseLevel { get; set; }
         public String nbcQNAurl { get; set; }

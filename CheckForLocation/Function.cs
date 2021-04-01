@@ -1,14 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
-using System.Net.Http;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Web;
 using Amazon;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.DocumentModel;
+using Amazon.DynamoDBv2.Model;
 using Amazon.Lambda.Core;
+using Amazon.Lex;
+using Amazon.Lex.Model;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.SecretsManager;
@@ -19,11 +15,15 @@ using Amazon.StepFunctions;
 using Amazon.StepFunctions.Model;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.DocumentModel;
-using Amazon.DynamoDBv2.Model;
-using Amazon.Lex;
-using Amazon.Lex.Model;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Web;
 
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]
 
@@ -81,7 +81,7 @@ namespace CheckForLocation
                     }
                 }
                 catch (Exception)
-                {}
+                { }
 
                 if (liveInstance)
                 {
@@ -108,7 +108,7 @@ namespace CheckForLocation
                         templateBucket = secrets.nncTemplateBucketLive;
                         cxmAPIName = secrets.cxmAPINameNorth;
                         nncSovereignEmailTable = secrets.nncSovereignEmailTableLive;
-                    }              
+                    }
                 }
                 else
                 {
@@ -195,7 +195,7 @@ namespace CheckForLocation
                     catch (Exception) { }
                     try
                     {
-                        caseDetails.forward = (String)caseSearch.SelectToken("values.emn_fwd_to_sovereign_council");                    
+                        caseDetails.forward = (String)caseSearch.SelectToken("values.emn_fwd_to_sovereign_council");
                     }
                     catch (Exception) { }
                     if (caseReference.ToLower().Contains("ema"))
@@ -237,16 +237,16 @@ namespace CheckForLocation
                 {
 
                     originalEmail = await GetContactFromDynamoAsync(caseReference);
-                    if (caseDetails.manualReview&&west)
+                    if (caseDetails.manualReview && west)
                     {
-                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil,caseDetails.sovereignServiceArea);
+                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, caseDetails.sovereignServiceArea);
                         if (String.IsNullOrEmpty(forwardingEmailAddress))
                         {
                             forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
                         }
-                        success = await SendEmails(caseDetails, forwardingEmailAddress,true);
+                        success = await SendEmails(caseDetails, forwardingEmailAddress, true);
                         caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
-                        if(caseDetails.sovereignCouncil.ToLower().Equals("northampton"))
+                        if (caseDetails.sovereignCouncil.ToLower().Equals("northampton"))
                         {
                             await TransitionCaseAsync("awaiting-review");
                         }
@@ -255,20 +255,22 @@ namespace CheckForLocation
                             await TransitionCaseAsync("close-case");
                         }
                     }
-                    else if(caseDetails.manualReview)
+                    else if (caseDetails.manualReview)
                     {
+                        Boolean replyToCustomer = true;
                         if (!String.IsNullOrEmpty(caseDetails.forward))
                         {
                             String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
-                            success = await SendEmails(caseDetails, forwardingEmailAddress, true);
-                        }                      
+                            success = await SendEmails(caseDetails, forwardingEmailAddress, replyToCustomer);
+                            replyToCustomer = false;
+                        }
                         if (!String.IsNullOrEmpty(caseDetails.nncForwardEMailTo))
                         {
-                            success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo,false);
+                            success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer);
                         }
                         await TransitionCaseAsync("close-case");
                     }
-                    else
+                    else 
                     {
                         Location sovereignLocation = await CheckForLocationAsync(caseDetails.enquiryDetails);
                         String service = await GetIntentFromLexAsync(originalEmail);
@@ -279,7 +281,14 @@ namespace CheckForLocation
                             String sovereignCouncilName = sovereignLocation.SovereignCouncilName.ToLower();
                             if (!district)
                             {
-                                sovereignCouncilName = "county";
+                                if(west)
+                                {
+                                    sovereignCouncilName = "county_west";
+                                }
+                                else
+                                {
+                                    sovereignCouncilName = "county_north";
+                                }                              
                                 sovereignLocation.SovereignCouncilName = "northamptonshire";
                             }
                             String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, service);
@@ -288,7 +297,7 @@ namespace CheckForLocation
                                 forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, "default");
                             }
                             UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
-                            success = await SendEmails(caseDetails, forwardingEmailAddress,true);
+                            success = await SendEmails(caseDetails, forwardingEmailAddress, true);
                             if (sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton"))
                             {
                                 await TransitionCaseAsync("awaiting-review");
@@ -321,7 +330,7 @@ namespace CheckForLocation
                                 String emailBody = await FormatEmailAsync(caseDetails, "email-location-request.txt");
                                 if (!String.IsNullOrEmpty(emailBody))
                                 {
-                                    if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails))
+                                    if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, caseDetails.customerEmail, emailBody, caseDetails))
                                     {
                                         success = false;
                                     }
@@ -334,7 +343,7 @@ namespace CheckForLocation
                                 }
                             }
                         }
-                    }                  
+                    }
                 }
                 else
                 {
@@ -403,54 +412,58 @@ namespace CheckForLocation
             return emailBody;
         }
 
-        private async Task<Boolean> SendMessageAsync(String emailSubject, String emailTo, String emailBody, CaseDetails caseDetails)
+        private async Task<Boolean> SendMessageAsync(String emailSubject, String emailTo, String replyTo, String emailBody, CaseDetails caseDetails)
         {
+            try
+            {
+                AmazonSQSClient amazonSQSClient = new AmazonSQSClient(sqsRegion);
                 try
                 {
-                    AmazonSQSClient amazonSQSClient = new AmazonSQSClient(sqsRegion);
-                    try
-                    {
-                        SendMessageRequest sendMessageRequest = new SendMessageRequest();
-                        sendMessageRequest.QueueUrl = sqsEmailURL;
-                        sendMessageRequest.MessageBody = emailBody;
-                        Dictionary<string, MessageAttributeValue> MessageAttributes = new Dictionary<string, MessageAttributeValue>();
-                        MessageAttributeValue messageTypeAttribute1 = new MessageAttributeValue();
-                        messageTypeAttribute1.DataType = "String";
-                        messageTypeAttribute1.StringValue = caseDetails.customerName;
-                        MessageAttributes.Add("Name", messageTypeAttribute1);
-                        MessageAttributeValue messageTypeAttribute2 = new MessageAttributeValue();
-                        messageTypeAttribute2.DataType = "String";
-                        messageTypeAttribute2.StringValue = emailTo;
-                        MessageAttributes.Add("To", messageTypeAttribute2);
-                        MessageAttributeValue messageTypeAttribute3 = new MessageAttributeValue();
-                        messageTypeAttribute3.DataType = "String";
-                        messageTypeAttribute3.StringValue = emailSubject;
-                        MessageAttributes.Add("Subject", messageTypeAttribute3);
-                        sendMessageRequest.MessageAttributes = MessageAttributes;
-                        SendMessageResponse sendMessageResponse = await amazonSQSClient.SendMessageAsync(sendMessageRequest);
-                    }
-                    catch (Exception error)
-                    {
-                        await SendFailureAsync("Error sending SQS message", error.Message);
-                        Console.WriteLine("ERROR : SendMessageAsync : Error sending SQS message : '{0}'", error.Message);
-                        Console.WriteLine("ERROR : SendMessageAsync : " + error.StackTrace);
-                        return false;
-                    }
+                    SendMessageRequest sendMessageRequest = new SendMessageRequest();
+                    sendMessageRequest.QueueUrl = sqsEmailURL;
+                    sendMessageRequest.MessageBody = emailBody;
+                    Dictionary<string, MessageAttributeValue> MessageAttributes = new Dictionary<string, MessageAttributeValue>();
+                    MessageAttributeValue messageTypeAttribute1 = new MessageAttributeValue();
+                    messageTypeAttribute1.DataType = "String";
+                    messageTypeAttribute1.StringValue = caseDetails.customerName;
+                    MessageAttributes.Add("Name", messageTypeAttribute1);
+                    MessageAttributeValue messageTypeAttribute2 = new MessageAttributeValue();
+                    messageTypeAttribute2.DataType = "String";
+                    messageTypeAttribute2.StringValue = emailTo;
+                    MessageAttributes.Add("To", messageTypeAttribute2);
+                    MessageAttributeValue messageTypeAttribute3 = new MessageAttributeValue();
+                    messageTypeAttribute3.DataType = "String";
+                    messageTypeAttribute3.StringValue = emailSubject;
+                    MessageAttributes.Add("Subject", messageTypeAttribute3);
+                    MessageAttributeValue messageTypeAttribute4 = new MessageAttributeValue();
+                    messageTypeAttribute4.DataType = "String";
+                    messageTypeAttribute4.StringValue = replyTo;
+                    MessageAttributes.Add("ReplyTo", messageTypeAttribute4);
+                    sendMessageRequest.MessageAttributes = MessageAttributes;
+                    SendMessageResponse sendMessageResponse = await amazonSQSClient.SendMessageAsync(sendMessageRequest);
                 }
                 catch (Exception error)
                 {
-                    await SendFailureAsync("Error starting AmazonSQSClient", error.Message);
-                    Console.WriteLine("ERROR : SendMessageAsync :  Error starting AmazonSQSClient : '{0}'", error.Message);
+                    await SendFailureAsync("Error sending SQS message", error.Message);
+                    Console.WriteLine("ERROR : SendMessageAsync : Error sending SQS message : '{0}'", error.Message);
                     Console.WriteLine("ERROR : SendMessageAsync : " + error.StackTrace);
                     return false;
                 }
+            }
+            catch (Exception error)
+            {
+                await SendFailureAsync("Error starting AmazonSQSClient", error.Message);
+                Console.WriteLine("ERROR : SendMessageAsync :  Error starting AmazonSQSClient : '{0}'", error.Message);
+                Console.WriteLine("ERROR : SendMessageAsync : " + error.StackTrace);
+                return false;
+            }
             return true;
         }
 
         private async Task<Location> CheckForLocationAsync(String emailBody)
         {
-            emailBody=emailBody.Replace("\n", " ");
-            emailBody=emailBody.Trim();
+            emailBody = emailBody.Replace("\n", " ");
+            emailBody = emailBody.Trim();
             Location sovereignLocation = new Location();
 
             String[] regArray = new string[4];
@@ -460,7 +473,7 @@ namespace CheckForLocation
             regArray[2] = @"^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([AZa-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9][A-Za-z]?)))) [0-9][A-Za-z]{2}).";
             regArray[3] = @"^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([AZa-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9][A-Za-z]?))))[0-9][A-Za-z]{2}).";
 
-            foreach ( String regString in regArray)
+            foreach (String regString in regArray)
             {
                 MatchCollection matches = Regex.Matches(emailBody, regString);
 
@@ -480,37 +493,43 @@ namespace CheckForLocation
                     catch (Exception) { }
                 }
             }
-            
-            if(emailBody.ToLower().Contains("northampton"))
+
+            if (emailBody.ToLower().Contains("northampton"))
             {
                 sovereignLocation.SovereignCouncilName = "Northampton";
                 sovereignLocation.Success = true;
-            } else
-            if (emailBody.ToLower().Contains("towcester")||emailBody.ToLower().Contains("cogenhoe"))
+            }
+            else
+            if (emailBody.ToLower().Contains("towcester") || emailBody.ToLower().Contains("cogenhoe"))
             {
                 sovereignLocation.SovereignCouncilName = "south_northants";
                 sovereignLocation.Success = true;
-            } else
-            if (emailBody.ToLower().Contains("daventry")) 
+            }
+            else
+            if (emailBody.ToLower().Contains("daventry"))
             {
                 sovereignLocation.SovereignCouncilName = "Daventry";
                 sovereignLocation.Success = true;
-            } else
+            }
+            else
             if (emailBody.ToLower().Contains("wellingborough"))
             {
                 sovereignLocation.SovereignCouncilName = "Wellingborough";
                 sovereignLocation.Success = true;
-            } else
+            }
+            else
             if (emailBody.ToLower().Contains("kettering"))
             {
                 sovereignLocation.SovereignCouncilName = "Kettering";
                 sovereignLocation.Success = true;
-            } else
+            }
+            else
             if (emailBody.ToLower().Contains("corby"))
             {
                 sovereignLocation.SovereignCouncilName = "Corby";
                 sovereignLocation.Success = true;
-            } else
+            }
+            else
             if (emailBody.ToLower().Contains("rushden"))
             {
                 sovereignLocation.SovereignCouncilName = "east_northants";
@@ -521,7 +540,7 @@ namespace CheckForLocation
 
         private static async Task<String> checkPostcode(String postcode)
         {
-            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, postCodeURL+postcode);
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, postCodeURL + postcode);
 
             HttpClient httpClient = new HttpClient();
 
@@ -536,9 +555,9 @@ namespace CheckForLocation
                     try
                     {
                         String returnString = (String)caseSearch.SelectToken("sovereign");
-                        if(returnString.ToLower().Equals("south northants"))
+                        if (returnString.ToLower().Equals("south northants"))
                         {
-                            returnString= "south_northants";
+                            returnString = "south_northants";
                         }
                         if (returnString.ToLower().Equals("east northants"))
                         {
@@ -549,11 +568,11 @@ namespace CheckForLocation
                     }
                     catch (Exception) { }
                 }
-                catch (NotSupportedException) 
+                catch (NotSupportedException)
                 {
                     Console.WriteLine("The content type is not supported.");
                 }
-                catch (JsonException) 
+                catch (JsonException)
                 {
                     Console.WriteLine("Invalid JSON.");
                 }
@@ -651,7 +670,7 @@ namespace CheckForLocation
                 if (String.IsNullOrEmpty(intentName))
                 {
                     intentName = "default";
-                    await SendToTrello(caseReference,secrets.trelloBoardTrainingLabelUnitaryService,secrets.trelloBoardTrainingLabelAWSLexUnitary);
+                    await SendToTrello(caseReference, secrets.trelloBoardTrainingLabelUnitaryService, secrets.trelloBoardTrainingLabelAWSLexUnitary);
                     UpdateCase("sovereign-service-area", "notfound");
                 }
                 else
@@ -678,7 +697,7 @@ namespace CheckForLocation
 
         private async Task<String> GetSovereignEmailFromDynamoAsync(String sovereignName, String service)
         {
-          try
+            try
             {
                 AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);
                 GetItemRequest request = new GetItemRequest
@@ -691,15 +710,15 @@ namespace CheckForLocation
                 };
                 GetItemResponse response = await dynamoDBClient.GetItemAsync(request);
 
-                Dictionary<String,AttributeValue> attributeMap = response.Item; 
+                Dictionary<String, AttributeValue> attributeMap = response.Item;
                 AttributeValue sovereignEmailAttribute;
                 attributeMap.TryGetValue("email", out sovereignEmailAttribute);
-                String sovereignEmail="";
+                String sovereignEmail = "";
                 try
                 {
                     sovereignEmail = sovereignEmailAttribute.S;
                 }
-                catch(Exception){}
+                catch (Exception) { }
                 return sovereignEmail;
             }
             catch (Exception error)
@@ -762,7 +781,7 @@ namespace CheckForLocation
                 emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
                 if (!String.IsNullOrEmpty(emailBody))
                 {
-                    if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, emailBody, caseDetails))
+                    if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, caseDetails.customerEmail, emailBody, caseDetails))
                     {
                         return false;
                     }
@@ -774,7 +793,7 @@ namespace CheckForLocation
                     return false;
                 }
             }
- 
+
             emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-forward.txt");
             if (!String.IsNullOrEmpty(emailBody))
             {
@@ -787,7 +806,7 @@ namespace CheckForLocation
                     }
                     subjectPrefix += "TEST - ";
                 }
-                if (!await SendMessageAsync(subjectPrefix + "Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), emailBody, caseDetails))
+                if (!await SendMessageAsync(subjectPrefix + "Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), caseDetails.customerEmail,emailBody, caseDetails))
                 {
                     return false;
                 }
@@ -810,7 +829,7 @@ namespace CheckForLocation
                 String requestParameters = "key=" + secrets.trelloAPIKey;
                 requestParameters += "&token=" + secrets.trelloAPIToken;
                 requestParameters += "&idList=" + secrets.trelloBoardTrainingListPending;
-                requestParameters += "&name=" + caseReference + " - No Unitary Service Found";             
+                requestParameters += "&name=" + caseReference + " - No Unitary Service Found";
                 requestParameters += "&desc=**[Full Case Details](" + myAccountEndPoint + "/q/case/" + caseReference + "/timeline)**";
                 requestParameters += "&pos=" + "bottom";
                 requestParameters += "&idLabels=" + fieldLabel + "," + techLabel;
@@ -929,8 +948,6 @@ namespace CheckForLocation
         public String cxmAPIKeyLiveNorth { get; set; }
         public String cxmAPINameNorth { get; set; }
         public String cxmAPINameWest { get; set; }
-        public String cxmAPICaseTypeNorth { get; set; }
-        public String cxmAPICaseTypeWest { get; set; }
         public String organisationName { get; set; }
         public String wncOrgName { get; set; }
         public String nncOrgName { get; set; }

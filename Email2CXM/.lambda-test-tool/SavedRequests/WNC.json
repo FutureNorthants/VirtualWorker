@@ -1,7 +1,7 @@
 {
   "Records": [
     {
-      "messageId": "19dd0b57-b21e-4ac1-bd88-01bbb068cb78",
+      "messageId": "scl8qrdmts71dar8d40o1m5baepfdvm9inom2no1",
       "receiptHandle": "MessageReceiptHandle",
       "body": "Hello from SQS!",
       "attributes": {

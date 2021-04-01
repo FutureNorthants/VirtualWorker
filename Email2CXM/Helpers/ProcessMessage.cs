@@ -166,7 +166,7 @@ namespace Email2CXM.Helpers
                                 cxmEndPoint = secrets.cxmEndPointLive;
                                 cxmAPIKey = secrets.cxmAPIKeyLive;
                                 cxmAPIName = secrets.cxmAPINameWest;
-                                cxmAPICaseType = secrets.cxmAPICaseTypeWest;
+                                cxmAPICaseType = secrets.cxmAPICaseTypeWestLive;
                                 tableName = secrets.wncEMACasesLive;
                             }
                             else
@@ -174,7 +174,7 @@ namespace Email2CXM.Helpers
                                 cxmEndPoint = secrets.cxmEndPointLiveNorth;
                                 cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
                                 cxmAPIName = secrets.cxmAPINameNorth;
-                                cxmAPICaseType = secrets.cxmAPICaseTypeNorth;
+                                cxmAPICaseType = secrets.cxmAPICaseTypeNorthLive;
                                 tableName = secrets.nncEMNCasesLive;
                             }
 
@@ -223,7 +223,7 @@ namespace Email2CXM.Helpers
                             bundlerFound = true;
                         }
                         SigParser.Client sigParserClient = new SigParser.Client(secrets.sigParseKey);
-                        String corporateSignature = await GetSignatureFromDynamoAsync(secrets.homeDomain);
+                        String corporateSignature = await GetSignatureFromDynamoAsync(secrets.homeDomain,"");
                         int corporateSignatureLocation = emailContents.IndexOf(corporateSignature);
                         if (corporateSignatureLocation > 0)
                         {
@@ -238,7 +238,14 @@ namespace Email2CXM.Helpers
                         {
                             int domainLocation = mailFromAddresses[currentAddress].Address.IndexOf("@");
                             domainLocation++;
-                            corporateSignature = await GetSignatureFromDynamoAsync(mailFromAddresses[currentAddress].Address.Substring(domainLocation));
+                            if(mailFromAddresses[currentAddress].Address.ToLower().Equals("customerservices@northamptonshire.gov.uk")) 
+                            {
+                                corporateSignature = await GetSignatureFromDynamoAsync(mailFromAddresses[currentAddress].Address.ToLower().Substring(domainLocation), "2");
+                            }
+                            else
+                            {
+                                corporateSignature = await GetSignatureFromDynamoAsync(mailFromAddresses[currentAddress].Address.ToLower().Substring(domainLocation), "");
+                            }
                             corporateSignatureLocation = emailContents.IndexOf(corporateSignature);
                             if (corporateSignatureLocation > 0)
                             {
@@ -508,7 +515,7 @@ namespace Email2CXM.Helpers
             return true;
         }
 
-        private async Task<String> GetSignatureFromDynamoAsync(String domain)
+        private async Task<String> GetSignatureFromDynamoAsync(String domain, String sigSuffix)
         {
             Console.WriteLine("Checking for known email signature for : " + domain);
             try
@@ -517,12 +524,12 @@ namespace Email2CXM.Helpers
                 Table table = Table.LoadTable(dynamoDBClient, "EmailSignatures");
                 GetItemOperationConfig config = new GetItemOperationConfig
                 {
-                    AttributesToGet = new List<String> { "signature" },
+                    AttributesToGet = new List<String> { "signature" + sigSuffix },
                     ConsistentRead = true
                 };
                 Document document = await table.GetItemAsync(domain, config);
-                Console.WriteLine("SUCCESS : GetSignatureFromDynamoAsync : " + document["signature"].AsPrimitive().Value.ToString());
-                return document["signature"].AsPrimitive().Value.ToString();
+                Console.WriteLine("SUCCESS : GetSignatureFromDynamoAsync : " + document["signature" + sigSuffix].AsPrimitive().Value.ToString());
+                return document["signature" + sigSuffix].AsPrimitive().Value.ToString();
             }
             catch (Exception error)
             {
@@ -709,6 +716,8 @@ namespace Email2CXM.Helpers
         public String cxmAPINameWest { get; set; }
         public String cxmAPICaseTypeNorth { get; set; }
         public String cxmAPICaseTypeWest { get; set; }
+        public String cxmAPICaseTypeWestLive { get; set; }
+        public String cxmAPICaseTypeNorthLive { get; set; }
         public String homeDomain { get; set; }
         public String botPersona1 { get; set; }
         public String botPersona2 { get; set; }
