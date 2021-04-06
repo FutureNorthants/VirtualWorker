@@ -8,11 +8,10 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Amazon.Lambda.Core" Version="1.2.0" />
-    <PackageReference Include="Amazon.Lambda.Serialization.Json" Version="1.8.0" />
-    <PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" Version="2.1.0" />
-    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.5.4.36" />
-    <PackageReference Include="AWSSDK.SecretsManager" Version="3.5.1.4" />
-    <PackageReference Include="AWSSDK.StepFunctions" Version="3.5.3.35" />
+    <PackageReference Include="Amazon.Lambda.Core" Version="2.0.0" />
+    <PackageReference Include="Amazon.Lambda.Serialization.Json" Version="2.0.0" />
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.0.8" />
+    <PackageReference Include="AWSSDK.SecretsManager" Version="3.7.0.7" />
+    <PackageReference Include="AWSSDK.StepFunctions" Version="3.7.0.7" />
   </ItemGroup>
 </Project>
