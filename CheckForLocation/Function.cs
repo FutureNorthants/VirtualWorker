@@ -298,7 +298,7 @@ namespace CheckForLocation
                             }
                             UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
                             success = await SendEmails(caseDetails, forwardingEmailAddress, true);
-                            if (sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton"))
+                            if (west&&sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton"))
                             {
                                 await TransitionCaseAsync("awaiting-review");
                             }
@@ -311,7 +311,7 @@ namespace CheckForLocation
                         {
                             Console.WriteLine(caseReference + " : Location Not Found");
                             Console.WriteLine(caseReference + " : Customer Has Updated : " + caseDetails.customerHasUpdated);
-                            if (caseDetails.customerHasUpdated)
+                            if (caseDetails.customerHasUpdated||sovereignLocation.PostcodeFound)
                             {
                                 if (west)
                                 {
@@ -488,6 +488,7 @@ namespace CheckForLocation
 
                 foreach (Match match in matches)
                 {
+                    sovereignLocation.PostcodeFound = true;
                     GroupCollection groups = match.Groups;
                     String sovereign = await checkPostcode(groups[0].Value);
                     try
@@ -501,6 +502,11 @@ namespace CheckForLocation
                     }
                     catch (Exception) { }
                 }
+            }
+
+            if (sovereignLocation.PostcodeFound)
+            {
+                return sovereignLocation;
             }
 
             if (emailBody.ToLower().Contains("northampton"))
@@ -969,6 +975,7 @@ namespace CheckForLocation
     public class Location
     {
         public Boolean Success = false;
+        public Boolean PostcodeFound = false;
         public String SovereignCouncilName = "";
     }
 }
