@@ -246,7 +246,18 @@ namespace Email2CXM.Helpers
                             {
                                 corporateSignature = await GetSignatureFromDynamoAsync(mailFromAddresses[currentAddress].Address.ToLower().Substring(domainLocation), "");
                             }
-                            corporateSignatureLocation = emailContents.IndexOf(corporateSignature);
+                            if (mailFromAddresses[currentAddress].Address.ToLower().Equals("noreply@northamptonshire.gov.uk"))
+                            {
+                                int nccSignatureLocation = emailContents.IndexOf("-------------------------------------------------");
+                                if (nccSignatureLocation > 0)
+                                {
+                                    emailContents = emailContents.Substring(0, nccSignatureLocation);
+                                    emailContents=emailContents.Trim();
+                                }
+                            }
+                            corporateSignatureLocation = emailContents.IndexOf(corporateSignature);                         
+                            Console.WriteLine("emaiSig2 : " + emailContents.Substring(750));
+                            Console.WriteLine("corpSig2 : " + corporateSignature);
                             if (corporateSignatureLocation > 0)
                             {
                                 Console.WriteLine("Corporate Signature Found " + currentAddress);
@@ -267,7 +278,6 @@ namespace Email2CXM.Helpers
                         { 
                             SigParser.EmailParseRequest sigParserRequest = new SigParser.EmailParseRequest { plainbody = emailContents, from_name = firstName + " " + lastName, from_address = emailFrom };
                             parsedEmailUnencoded = sigParserClient.Parse(sigParserRequest).cleanedemailbody_plain;
-                            //var temp = sigParserClient.Parse(sigParserRequest);
                             if ((parsedEmailUnencoded == null || parsedEmailUnencoded.Contains("___")) && !bundlerFound)
                             {
                                 Console.WriteLine($"No message found, checking for forwarded message");
@@ -517,7 +527,7 @@ namespace Email2CXM.Helpers
 
         private async Task<String> GetSignatureFromDynamoAsync(String domain, String sigSuffix)
         {
-            Console.WriteLine("Checking for known email signature for : " + domain);
+            Console.WriteLine("GetSignatureFromDynamoAsync : Checking for known email signature for : " + domain + " " + sigSuffix);
             try
             {
                 AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);

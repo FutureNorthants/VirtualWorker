@@ -455,6 +455,7 @@ namespace CheckForLocation
                 {
                     await SendFailureAsync("Error sending SQS message", error.Message);
                     Console.WriteLine("ERROR : SendMessageAsync : Error sending SQS message : '{0}'", error.Message);
+                    Console.WriteLine("ERROR : SendMessageAsync : " + caseReference + " : " + emailTo + " : " + emailBody);
                     Console.WriteLine("ERROR : SendMessageAsync : " + error.StackTrace);
                     return false;
                 }
@@ -490,12 +491,12 @@ namespace CheckForLocation
                 {
                     sovereignLocation.PostcodeFound = true;
                     GroupCollection groups = match.Groups;
-                    String sovereign = await checkPostcode(groups[0].Value);
+                    Postcode postCodeData = await CheckPostcode(groups[0].Value);
                     try
                     {
-                        if (!String.IsNullOrEmpty(sovereign))
+                        if (postCodeData.success)
                         {
-                            sovereignLocation.SovereignCouncilName = sovereign;
+                            sovereignLocation.SovereignCouncilName = postCodeData.SovereignCouncilName;
                             sovereignLocation.Success = true;
                             return sovereignLocation;
                         }
@@ -512,49 +513,58 @@ namespace CheckForLocation
             if (emailBody.ToLower().Contains("northampton"))
             {
                 sovereignLocation.SovereignCouncilName = "Northampton";
+                sovereignLocation.sovereignWest = true;
                 sovereignLocation.Success = true;
             }
             else
             if (emailBody.ToLower().Contains("towcester") || emailBody.ToLower().Contains("cogenhoe"))
             {
                 sovereignLocation.SovereignCouncilName = "south_northants";
+                sovereignLocation.sovereignWest = true;
                 sovereignLocation.Success = true;
             }
             else
             if (emailBody.ToLower().Contains("daventry"))
             {
                 sovereignLocation.SovereignCouncilName = "Daventry";
+                sovereignLocation.sovereignWest = true;
                 sovereignLocation.Success = true;
             }
             else
             if (emailBody.ToLower().Contains("wellingborough"))
             {
                 sovereignLocation.SovereignCouncilName = "Wellingborough";
+                sovereignLocation.sovereignWest = false;
                 sovereignLocation.Success = true;
             }
             else
             if (emailBody.ToLower().Contains("kettering"))
             {
                 sovereignLocation.SovereignCouncilName = "Kettering";
+                sovereignLocation.sovereignWest = false;
                 sovereignLocation.Success = true;
             }
             else
             if (emailBody.ToLower().Contains("corby"))
             {
                 sovereignLocation.SovereignCouncilName = "Corby";
+                sovereignLocation.sovereignWest = false;
                 sovereignLocation.Success = true;
             }
             else
             if (emailBody.ToLower().Contains("rushden"))
             {
                 sovereignLocation.SovereignCouncilName = "east_northants";
+                sovereignLocation.sovereignWest = false;
                 sovereignLocation.Success = true;
             }
             return sovereignLocation;
         }
 
-        private static async Task<String> checkPostcode(String postcode)
+        private static async Task<Postcode> CheckPostcode(String postcode)
         {
+            Postcode postCodeData = new Postcode();
+
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, postCodeURL + postcode);
 
             HttpClient httpClient = new HttpClient();
@@ -569,31 +579,62 @@ namespace CheckForLocation
                     JObject caseSearch = JObject.Parse(responseString);
                     try
                     {
-                        String returnString = (String)caseSearch.SelectToken("sovereign");
-                        if (returnString.ToLower().Equals("south northants"))
+                        if((int)caseSearch.SelectToken("numOfSovereign") == 1)
                         {
-                            returnString = "south_northants";
+                            postCodeData.singleSov = true;
                         }
-                        if (returnString.ToLower().Equals("east northants"))
+                    }
+                    catch (Exception) { }
+                    try
+                    {
+                        if ((int)caseSearch.SelectToken("numOfUnitary") == 1)
                         {
-                            returnString = "east_northants";
+                            postCodeData.singleUni = true;
                         }
-
-                        return returnString;
+                    }
+                    catch (Exception) { }
+                    try
+                    {
+                        if ((int)caseSearch.SelectToken("unitary[0].unitaryCode") == 2)
+                        {
+                            postCodeData.west = true;
+                        }
+                    }
+                    catch (Exception) { }
+                    try
+                    {
+                        postCodeData.SovereignCouncilName = (String)caseSearch.SelectToken("sovereign[0].sovereignName").ToString().ToLower();
+                    }
+                    catch (Exception) { }
+                    try
+                    {
+                        if (postCodeData.SovereignCouncilName.Equals("south northants"))
+                        {
+                            postCodeData.SovereignCouncilName = "south_northants";
+                        }
+                    }
+                    catch (Exception) { }
+                    try
+                    {
+                        if (postCodeData.SovereignCouncilName.Equals("east northants"))
+                        {
+                            postCodeData.SovereignCouncilName = "east_northants";
+                        }
                     }
                     catch (Exception) { }
                 }
                 catch (NotSupportedException)
                 {
                     Console.WriteLine("The content type is not supported.");
+                    postCodeData.success = false;
                 }
                 catch (JsonException)
                 {
                     Console.WriteLine("Invalid JSON.");
+                    postCodeData.success = false;
                 }
             }
-
-            return null;
+            return postCodeData;
         }
 
         private Boolean UpdateCase(String fieldName, String fieldValue)
@@ -976,6 +1017,16 @@ namespace CheckForLocation
     {
         public Boolean Success = false;
         public Boolean PostcodeFound = false;
+        public Boolean sovereignWest = false;
+        public String SovereignCouncilName = "";
+    }
+
+    public class Postcode
+    {
+        public Boolean success = true;
+        public Boolean singleUni = false;
+        public Boolean singleSov = false;
+        public Boolean west = false;
         public String SovereignCouncilName = "";
     }
 }
