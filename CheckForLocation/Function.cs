@@ -52,9 +52,12 @@ namespace CheckForLocation
         private static String cxmAPIName;
         private static String orgName;
         private static String nncSovereignEmailTable;
+        private static String norbertSendFrom;
+
         private Boolean liveInstance = false;
         private Boolean district = true;
         private Boolean west = true;
+        private Boolean preventOutOfArea = true;
 
         private Secrets secrets = null;
 
@@ -97,6 +100,15 @@ namespace CheckForLocation
                         cxmAPIKey = secrets.cxmAPIKeyLive;
                         templateBucket = secrets.templateBucketLive;
                         cxmAPIName = secrets.cxmAPINameWest;
+                        norbertSendFrom = secrets.norbertSendFromLive;
+                        try
+                        {
+                            if (secrets.wncPreventOutOfAreaLive.ToLower().Equals("false"))
+                            {
+                                preventOutOfArea = false;
+                            }
+                        }
+                        catch (Exception) { }
                     }
                     if (caseReference.ToLower().Contains("emn"))
                     {
@@ -108,6 +120,15 @@ namespace CheckForLocation
                         templateBucket = secrets.nncTemplateBucketLive;
                         cxmAPIName = secrets.cxmAPINameNorth;
                         nncSovereignEmailTable = secrets.nncSovereignEmailTableLive;
+                        norbertSendFrom = secrets.nncSendFromLive;
+                        try
+                        {
+                            if (secrets.nncPreventOutOfAreaLive.ToLower().Equals("false"))
+                            {
+                                preventOutOfArea = false;
+                            }
+                        }
+                        catch (Exception) { }
                     }
                 }
                 else
@@ -128,6 +149,15 @@ namespace CheckForLocation
                         templateBucket = secrets.templateBucketTest;
                         cxmAPIName = secrets.cxmAPINameWest;
                         orgName = secrets.wncOrgName;
+                        norbertSendFrom = secrets.norbertSendFromTest;
+                        try
+                        {
+                            if (secrets.wncPreventOutOfAreaTest.ToLower().Equals("false"))
+                            {
+                                preventOutOfArea = false;
+                            }
+                        }
+                        catch (Exception) { }
                     }
                     if (caseReference.ToLower().Contains("emn"))
                     {
@@ -140,6 +170,15 @@ namespace CheckForLocation
                         cxmAPIName = secrets.cxmAPINameNorth;
                         orgName = secrets.nncOrgName;
                         nncSovereignEmailTable = secrets.nncSovereignEmailTableTest;
+                        norbertSendFrom = secrets.nncSendFromTest;
+                        try
+                        {
+                            if (secrets.nncPreventOutOfAreaTest.ToLower().Equals("false"))
+                            {
+                                preventOutOfArea = false;
+                            }
+                        }
+                        catch (Exception) { }
                     }
                 }
                 CaseDetails caseDetails = await GetCaseDetailsAsync();
@@ -297,15 +336,27 @@ namespace CheckForLocation
                                 forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, "default");
                             }
                             UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
-                            success = await SendEmails(caseDetails, forwardingEmailAddress, true);
-                            if (west&&sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton"))
+                            if (west && !sovereignLocation.sovereignWest)
                             {
-                                await TransitionCaseAsync("awaiting-review");
-                            }
-                            else
+                                UpdateCase("email-comments", "Contact destination out of area");
+                                await TransitionCaseAsync("unitary-awaiting-review");
+                            } else
+                            if (!west && sovereignLocation.sovereignWest)
                             {
-                                await TransitionCaseAsync("close-case");
-                            }
+                                UpdateCase("email-comments", "Contact destination out of area");
+                                await TransitionCaseAsync("hub-awaiting-review");
+                            } else
+                            {
+                                success = await SendEmails(caseDetails, forwardingEmailAddress, true);
+                                if (west && sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton"))
+                                {
+                                    await TransitionCaseAsync("awaiting-review");
+                                }
+                                else
+                                {
+                                    await TransitionCaseAsync("close-case");
+                                }
+                            }                        
                         }
                         else
                         {
@@ -497,6 +548,7 @@ namespace CheckForLocation
                         if (postCodeData.success)
                         {
                             sovereignLocation.SovereignCouncilName = postCodeData.SovereignCouncilName;
+                            sovereignLocation.sovereignWest = postCodeData.west;
                             sovereignLocation.Success = true;
                             return sovereignLocation;
                         }
@@ -561,7 +613,7 @@ namespace CheckForLocation
             return sovereignLocation;
         }
 
-        private static async Task<Postcode> CheckPostcode(String postcode)
+        private async Task<Postcode> CheckPostcode(String postcode)
         {
             Postcode postCodeData = new Postcode();
 
@@ -583,6 +635,10 @@ namespace CheckForLocation
                         {
                             postCodeData.singleSov = true;
                         }
+                        else
+                        {
+                            UpdateCase("email-comments", "Postcode spans multiple sovereign councils");
+                        }
                     }
                     catch (Exception) { }
                     try
@@ -590,6 +646,10 @@ namespace CheckForLocation
                         if ((int)caseSearch.SelectToken("numOfUnitary") == 1)
                         {
                             postCodeData.singleUni = true;
+                        }
+                        else
+                        {
+                            UpdateCase("email-comments", "Postcode spans both WNC and NNC");
                         }
                     }
                     catch (Exception) { }
@@ -633,6 +693,10 @@ namespace CheckForLocation
                     Console.WriteLine("Invalid JSON.");
                     postCodeData.success = false;
                 }
+            }
+            else
+            {
+                postCodeData.success = false;
             }
             return postCodeData;
         }
@@ -837,7 +901,7 @@ namespace CheckForLocation
                 emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
                 if (!String.IsNullOrEmpty(emailBody))
                 {
-                    if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, caseDetails.customerEmail, emailBody, caseDetails))
+                    if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, norbertSendFrom, emailBody, caseDetails))
                     {
                         return false;
                     }
@@ -1011,6 +1075,14 @@ namespace CheckForLocation
         public String nncTemplateBucketTest { get; set; }
         public String nncSovereignEmailTableLive { get; set; }
         public String nncSovereignEmailTableTest { get; set; }
+        public String norbertSendFromLive { get; set; }
+        public String norbertSendFromTest { get; set; }
+        public String nncSendFromLive { get; set; }
+        public String nncSendFromTest { get; set; }
+        public String nncPreventOutOfAreaLive { get; set; }
+        public String nncPreventOutOfAreaTest { get; set; }
+        public String wncPreventOutOfAreaLive { get; set; }
+        public String wncPreventOutOfAreaTest { get; set; }
     }
 
     public class Location
