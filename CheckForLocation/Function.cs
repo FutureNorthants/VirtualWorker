@@ -181,10 +181,12 @@ namespace CheckForLocation
                         catch (Exception) { }
                     }
                 }
+                Console.WriteLine(caseReference + " : Prevent Out of Area : " + preventOutOfArea);
                 CaseDetails caseDetails = await GetCaseDetailsAsync();
                 await ProcessCaseAsync(caseDetails);
                 await SendSuccessAsync();
             }
+
             Console.WriteLine("Completed");
         }
 
@@ -336,12 +338,12 @@ namespace CheckForLocation
                                 forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, "default");
                             }
                             UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
-                            if (west && !sovereignLocation.sovereignWest)
+                            if (preventOutOfArea && west && !sovereignLocation.sovereignWest)
                             {
                                 UpdateCase("email-comments", "Contact destination out of area");
                                 await TransitionCaseAsync("unitary-awaiting-review");
                             } else
-                            if (!west && sovereignLocation.sovereignWest)
+                            if (preventOutOfArea && !west && sovereignLocation.sovereignWest)
                             {
                                 UpdateCase("email-comments", "Contact destination out of area");
                                 await TransitionCaseAsync("hub-awaiting-review");
