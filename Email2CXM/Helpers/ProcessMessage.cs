@@ -435,6 +435,7 @@ namespace Email2CXM.Helpers
                                             { "enquiry-details", parsedEmailUnencoded },
                                             { "customer-has-updated", false },
                                             { "unitary", unitary },
+                                            { "contact-us", contactUs },
                                             { "original-email", await TrimEmailContents(message.TextBody) }
                                     };
                                     if (!person.Equals(""))
