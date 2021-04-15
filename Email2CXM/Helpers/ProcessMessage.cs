@@ -44,6 +44,7 @@ namespace Email2CXM.Helpers
         private String emailFrom { get; set; } = null;
         private String emailTo { get; set; } = null;
         private String subject { get; set; } = null;
+        private String serviceArea { get; set; } = null;
         public String firstName { get; set; } = null;
         public String lastName { get; set; } = null;
         public String emailBody { get; set; } = null;
@@ -51,6 +52,7 @@ namespace Email2CXM.Helpers
         public String emailContents { get; set; } = null;
         public String telNo { get; set; } = null;
         public String address { get; set; } = null;
+
 
         public Boolean create = true;
         public Boolean unitary = false;
@@ -243,7 +245,7 @@ namespace Email2CXM.Helpers
                             }
                             if (mailFromAddresses[currentAddress].Address.ToLower().Equals("noreply@northamptonshire.gov.uk"))
                             {
-                                int nccSignatureLocation = emailContents.IndexOf("-------------------------------------------------");
+                                int nccSignatureLocation = emailContents.IndexOf("Any views expressed in this email are those of the individual sender");
                                 if (nccSignatureLocation > 0)
                                 {
                                     emailContents = emailContents.Substring(0, nccSignatureLocation);
@@ -266,57 +268,64 @@ namespace Email2CXM.Helpers
                         {
                             try
                             {
+                                int serviceAreaStarts = emailContents.ToLower().IndexOf("service: ") + 9;
+                                int serviceAreaEnds = emailContents.ToLower().IndexOf("enquiry details:");
+                                serviceArea = (emailContents.Substring(serviceAreaStarts, serviceAreaEnds - serviceAreaStarts).TrimEnd('\r', '\n')).ToLower();
+                            }
+                            catch { }
+                            try
+                            {
                                 int emailAddressStarts = emailContents.ToLower().IndexOf("email address:") + 15;
-                                int emailAddressEnds = emailContents.ToLower().IndexOf("telephone number:") - 4;
-                                emailFrom = emailContents.Substring(emailAddressStarts, emailAddressEnds - emailAddressStarts);
+                                int emailAddressEnds = emailContents.ToLower().IndexOf("telephone number:");
+                                emailFrom = emailContents.Substring(emailAddressStarts, emailAddressEnds - emailAddressStarts).TrimEnd('\r', '\n'); 
                             }
                             catch { }
                             try
                             {
                                 int firstNameStarts = emailContents.ToLower().IndexOf("first name: ") + 12;
-                                int firstNameEnds = emailContents.ToLower().IndexOf("last name:") - 4;
-                                firstName = emailContents.Substring(firstNameStarts, firstNameEnds - firstNameStarts);
+                                int firstNameEnds = emailContents.ToLower().IndexOf("last name:");
+                                firstName = emailContents.Substring(firstNameStarts, firstNameEnds - firstNameStarts).TrimEnd('\r', '\n'); 
                             }
                             catch { }
                             try
                             {
                                 int lastNameStarts = emailContents.ToLower().IndexOf("last name: ") + 11;
-                                int lastNameEnds = emailContents.ToLower().IndexOf("email address:") - 4;
-                                lastName = emailContents.Substring(lastNameStarts, lastNameEnds - lastNameStarts);
+                                int lastNameEnds = emailContents.ToLower().IndexOf("email address:");
+                                lastName = emailContents.Substring(lastNameStarts, lastNameEnds - lastNameStarts).TrimEnd('\r', '\n'); 
                             }
                             catch { }
                             try
                             {
                                 int telNoStarts = emailContents.ToLower().IndexOf("telephone number: ") + 18;
-                                int telNoEnds = emailContents.ToLower().IndexOf("address line 1:") - 4;
-                                telNo = emailContents.Substring(telNoStarts, telNoEnds - telNoStarts);
+                                int telNoEnds = emailContents.ToLower().IndexOf("address line 1:");
+                                telNo = emailContents.Substring(telNoStarts, telNoEnds - telNoStarts).TrimEnd('\r', '\n'); 
                             }
                             catch { }
                             try
                             {
                                 int address1Starts = emailContents.ToLower().IndexOf("address line 1: ") + 16;
-                                int address1Ends = emailContents.ToLower().IndexOf("address line 2:") - 4;
-                                address = emailContents.Substring(address1Starts, address1Ends - address1Starts) + ", ";
+                                int address1Ends = emailContents.ToLower().IndexOf("address line 2:");
+                                address = emailContents.Substring(address1Starts, address1Ends - address1Starts).TrimEnd('\r', '\n') + ", ";
                             }
                             catch { }
                             try
                             {
                                 int address2Starts = emailContents.ToLower().IndexOf("address line 2: ") + 16;
-                                int address2Ends = emailContents.ToLower().IndexOf("address line 3:") - 4;
+                                int address2Ends = emailContents.ToLower().IndexOf("address line 3:");
                                 if (address2Ends < 0)
                                 {
-                                    address2Ends = emailContents.ToLower().IndexOf("postcode:") - 8;
+                                    address2Ends = emailContents.ToLower().IndexOf("postcode:");
                                 }
-                                address+= emailContents.Substring(address2Starts, address2Ends - address2Starts) + ", ";
+                                address+= emailContents.Substring(address2Starts, address2Ends - address2Starts).TrimEnd('\r', '\n') + ", ";
                             }
                             catch { }
                             try
                             {
                                 int address3Starts = emailContents.ToLower().IndexOf("address line 3: ") + 16;
-                                int address3Ends = emailContents.ToLower().IndexOf("postcode:") - 4;
+                                int address3Ends = emailContents.ToLower().IndexOf("postcode:");
                                 if (address3Starts > 16)
                                 {
-                                    address+= emailContents.Substring(address3Starts, address3Ends - address3Starts) + ", ";
+                                    address+= emailContents.Substring(address3Starts, address3Ends - address3Starts).TrimEnd('\r', '\n') + ", ";
                                 }                                
                             }
                             catch { }
@@ -324,14 +333,14 @@ namespace Email2CXM.Helpers
                             {
                                 int postcodeStarts = emailContents.ToLower().IndexOf("postcode: ") + 10;
                                 int postcodeEnds = emailContents.Length; 
-                                address += emailContents.Substring(postcodeStarts, postcodeEnds - postcodeStarts);
+                                address += emailContents.Substring(postcodeStarts, postcodeEnds - postcodeStarts).TrimEnd('\r', '\n');
                             }
                             catch { }
                             try
                             {
                                 int startOfContact = emailContents.ToLower().IndexOf("enquiry details: ") + 17;
-                                int endOfContact = emailContents.ToLower().IndexOf("about you") - 4;
-                                emailContents = emailContents.Substring(startOfContact, endOfContact - startOfContact);
+                                int endOfContact = emailContents.ToLower().IndexOf("about you");
+                                emailContents = emailContents.Substring(startOfContact, endOfContact - startOfContact).TrimEnd('\r', '\n');
                                 parsedEmailUnencoded = emailContents;
                                 parsedEmailEncoded = HttpUtility.UrlEncode(emailContents);
                             }

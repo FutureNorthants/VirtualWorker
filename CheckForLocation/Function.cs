@@ -61,6 +61,8 @@ namespace CheckForLocation
 
         private Secrets secrets = null;
 
+        private Location sovereignLocation;
+
         public async Task FunctionHandler(object input, ILambdaContext context)
         {
             if (await GetSecrets())
@@ -253,6 +255,11 @@ namespace CheckForLocation
                         caseDetails.customerAddress = (String)caseSearch.SelectToken("values.customer_address");
                     }
                     catch (Exception) { }
+                    try
+                    {
+                        caseDetails.telephoneNumber = (String)caseSearch.SelectToken("values.telephone_number");
+                    }
+                    catch (Exception) { }
                     if (caseReference.ToLower().Contains("emn"))
                     {
                         caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
@@ -323,7 +330,7 @@ namespace CheckForLocation
                     }
                     else 
                     {
-                        Location sovereignLocation = await CheckForLocationAsync(caseDetails.enquiryDetails);
+                       sovereignLocation = await CheckForLocationAsync(caseDetails.enquiryDetails);
                         if (caseDetails.contactUs && !sovereignLocation.Success)
                         {
                             sovereignLocation = await CheckForLocationAsync(caseDetails.customerAddress);
@@ -363,13 +370,15 @@ namespace CheckForLocation
                                 await TransitionCaseAsync("hub-awaiting-review");
                             } else
                             {
-                                success = await SendEmails(caseDetails, forwardingEmailAddress, true);
+                                success = await SendEmails(caseDetails, forwardingEmailAddress, true);                               
                                 if (west && sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton"))
                                 {
+                                    UpdateCase("email-comments", "Transitioning case to local process");
                                     await TransitionCaseAsync("awaiting-review");
                                 }
                                 else
                                 {
+                                    UpdateCase("email-comments", "Closing case");
                                     await TransitionCaseAsync("close-case");
                                 }
                             }                        
@@ -397,7 +406,11 @@ namespace CheckForLocation
                                 String emailBody = await FormatEmailAsync(caseDetails, "email-location-request.txt");
                                 if (!String.IsNullOrEmpty(emailBody))
                                 {
-                                    if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, caseDetails.customerEmail, emailBody, caseDetails))
+                                    if (await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, caseDetails.customerEmail, emailBody, caseDetails))
+                                    {
+                                        UpdateCase("email-comments", "email requesting location details sent to " + caseDetails.customerEmail);                                       
+                                    }
+                                    else
                                     {
                                         success = false;
                                     }
@@ -462,7 +475,7 @@ namespace CheckForLocation
                     emailBody = reader.ReadToEnd();
                 }
                 emailBody = emailBody.Replace("AAA", caseReference);
-                emailBody = emailBody.Replace("KKK", caseDetails.customerEmail);
+                //emailBody = emailBody.Replace("KKK", caseDetails.customerEmail);
                 emailBody = emailBody.Replace("ZZZ", caseDetails.enquiryDetails);
                
                 if (String.IsNullOrEmpty(caseDetails.fullEmail))
@@ -477,7 +490,35 @@ namespace CheckForLocation
                         tempDetails = HttpUtility.HtmlEncode(caseDetails.enquiryDetails) + "<BR><BR>";
                     }
                     emailBody = emailBody.Replace("OOO", tempDetails + HttpUtility.HtmlEncode(caseDetails.fullEmail));
-                }              
+                }
+
+                if (caseDetails.contactUs)
+                {
+                    if (!String.IsNullOrEmpty(caseDetails.customerEmail))
+                    {
+                        emailBody = emailBody.Replace("MMM", "The customer's email address is - <b>" + caseDetails.customerEmail + "</b><br><br>");
+                    }
+                    else
+                    {
+                        emailBody = emailBody.Replace("MMM", "");
+                    }
+                    if (!String.IsNullOrEmpty(caseDetails.customerAddress))
+                    {
+                        emailBody = emailBody.Replace("PPP", "The customer's address is - <b>" + caseDetails.customerAddress + "</b><br><br>");
+                    }
+                    else
+                    {
+                        emailBody = emailBody.Replace("PPP", "");
+                    }
+                    if (!String.IsNullOrEmpty(caseDetails.telephoneNumber))
+                    {
+                        emailBody = emailBody.Replace("TTT", "You can contact the customer on - <b>" + caseDetails.telephoneNumber + "</b><br><br>");
+                    }
+                    else
+                    {
+                        emailBody = emailBody.Replace("TTT", "");
+                    }
+                }
             }
             catch (Exception error)
             {
@@ -911,29 +952,55 @@ namespace CheckForLocation
 
         private async Task<Boolean> SendEmails(CaseDetails caseDetails, String forwardingEmailAddress, Boolean replyToCustomer)
         {
+            Console.WriteLine(caseReference + " : SendEmails Started");
             String emailBody = "";
             if (replyToCustomer)
             {
+                Console.WriteLine(caseReference + " : Sending confirmation email");
                 emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
                 if (!String.IsNullOrEmpty(emailBody))
                 {
                     if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, norbertSendFrom, emailBody, caseDetails))
                     {
+                        Console.WriteLine(caseReference + " : ERROR : Failed to send confirmation email");
+                        UpdateCase("email-comments", "Failed to send confirmation email to " + caseDetails.customerEmail);
                         return false;
                     }
+                    Console.WriteLine(caseReference + " : Sent confirmation email");
+                    UpdateCase("email-comments", "Confirmation email sent to " + caseDetails.customerEmail);
                 }
                 else
                 {
+                    Console.WriteLine(caseReference + " : ERROR : Failed to send confirmation email");
+                    UpdateCase("email-comments", "Failed to send confirmation email to " + caseDetails.customerEmail);
                     await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
-                    Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
                     return false;
                 }
             }
 
-            if(caseDetails.sovereignCouncil.ToLower().Equals("northampton")){}
+            Console.WriteLine(caseReference + " : Sending forward email");
+ 
+
+            if (sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton"))
+            {
+                Console.WriteLine(caseReference + " : Local case no forward necessary");
+            }
             else
             {
-                emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-forward.txt");
+                Console.WriteLine(caseReference + " : Preparing to forward email");
+                String forwardFileName = "";
+                if (caseDetails.contactUs) 
+                {
+                    Console.WriteLine(caseReference + " : ContactUs case");
+                    forwardFileName = "email-sovereign-forward-contactus.txt";
+                }
+                else
+                {
+                    Console.WriteLine(caseReference + " : Email case");
+                    forwardFileName = "email-sovereign-forward.txt";
+                }                    
+                emailBody = await FormatEmailAsync(caseDetails, forwardFileName);
+                Console.WriteLine(caseReference + " : Email contents set");
                 if (!String.IsNullOrEmpty(emailBody))
                 {
                     String subjectPrefix = "";
@@ -947,16 +1014,22 @@ namespace CheckForLocation
                     }
                     if (!await SendMessageAsync(subjectPrefix + "Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), caseDetails.customerEmail, emailBody, caseDetails))
                     {
+                        Console.WriteLine(caseReference + " : ERROR : Failed to forward email");
+                        UpdateCase("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
                         return false;
                     }
+                    Console.WriteLine(caseReference + " : Forwarded email");
+                    UpdateCase("email-comments", "Forwarded email to " + forwardingEmailAddress.ToLower());
                 }
                 else
                 {
-                    await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
-                    Console.WriteLine("ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
+                    Console.WriteLine(caseReference + "ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
+                    UpdateCase("email-comments", "Failed to forward email to " + caseDetails.customerEmail);
+                    await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");                   
                     return false;
                 }
-            }         
+            }
+            Console.WriteLine(caseReference + " : SendEmails Ended");
             return true;
         }
 
@@ -1056,6 +1129,7 @@ namespace CheckForLocation
         public String sovereignServiceArea { get; set; } = "";
         public String nncForwardEMailTo { get; set; } = "";
         public String customerAddress { get; set; } = "";
+        public String telephoneNumber { get; set; } = "";
         public Boolean customerHasUpdated { get; set; } = false;
         public Boolean manualReview { get; set; } = false;
         public Boolean contactUs { get; set; } = false;

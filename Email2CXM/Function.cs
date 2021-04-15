@@ -53,9 +53,9 @@ namespace Email2CXM
             catch
             {
                 //Test Code
-                //bucket = "norbert.emails.test";
-                bucket = "nnc.emails.test";
-                file = "kw7";
+                bucket = "norbert.emails.test";
+                //bucket = "nnc.emails.test";
+                file = "2463hir6cm6qut3kjheqs8pj430obmk4105pn981";
             }
  
 
