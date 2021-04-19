@@ -67,6 +67,11 @@ namespace CheckForLocation
         {
             if (await GetSecrets())
             {
+                liveInstance = false;
+                district = true;
+                west = true;
+                preventOutOfArea = true;
+
                 templateBucket = secrets.templateBucketTest;
                 sqsEmailURL = secrets.sqsEmailURLTest;
                 postCodeURL = secrets.postcodeURLTest;
@@ -335,11 +340,22 @@ namespace CheckForLocation
                         {
                             sovereignLocation = await CheckForLocationAsync(caseDetails.customerAddress);
                         }
-                        String service = await GetServiceAsync(originalEmail);
+                        String service = "";
+
+                        if (caseDetails.contactUs&&!String.IsNullOrEmpty(caseDetails.sovereignServiceArea))
+                        {
+                            Console.WriteLine(caseReference + " : SovereignServiceArea set using  : " + caseDetails.sovereignServiceArea);
+                            service = caseDetails.sovereignServiceArea;
+                        }
+                        else
+                        {
+                            Console.WriteLine(caseReference + " : SovereignServiceArea not set using Lex ");
+                            service = await GetServiceAsync(originalEmail);
+                        }                      
 
                         if (sovereignLocation.Success)
                         {
-                            Console.WriteLine(caseReference + " : Location Found");
+                            Console.WriteLine(caseReference + " : Location Found : " + sovereignLocation.SovereignCouncilName.ToLower());
                             String sovereignCouncilName = sovereignLocation.SovereignCouncilName.ToLower();
                             if (!district)
                             {
@@ -363,7 +379,8 @@ namespace CheckForLocation
                             {
                                 UpdateCase("email-comments", "Contact destination out of area");
                                 await TransitionCaseAsync("unitary-awaiting-review");
-                            } else
+                            } 
+                            else
                             if (preventOutOfArea && !west && sovereignLocation.sovereignWest)
                             {
                                 UpdateCase("email-comments", "Contact destination out of area");
@@ -621,6 +638,7 @@ namespace CheckForLocation
 
             if (emailBody.ToLower().Contains("northampton"))
             {
+                //if((emailBody.ToLower().inde)
                 sovereignLocation.SovereignCouncilName = "Northampton";
                 sovereignLocation.sovereignWest = true;
                 sovereignLocation.Success = true;
