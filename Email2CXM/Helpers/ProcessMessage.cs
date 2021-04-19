@@ -52,11 +52,12 @@ namespace Email2CXM.Helpers
         public String emailContents { get; set; } = null;
         public String telNo { get; set; } = null;
         public String address { get; set; } = null;
-
+        public String ContactUsTableMapping { get; set; } = null;
 
         public Boolean create = true;
         public Boolean unitary = false;
         public Boolean contactUs = false;
+        public Boolean district = true;
 
         private Boolean west = true;
 
@@ -67,6 +68,10 @@ namespace Email2CXM.Helpers
 
         public Boolean Process(String bucketName, String keyName, Boolean liveInstance)
         {
+            create = true;
+            unitary = false;
+            contactUs = false;
+            district = true;
             return ReadObjectDataAsync(bucketName, keyName, liveInstance).Result;
         }
 
@@ -165,6 +170,7 @@ namespace Email2CXM.Helpers
                                 cxmAPIName = secrets.cxmAPINameWest;
                                 cxmAPICaseType = secrets.cxmAPICaseTypeWestLive;
                                 tableName = secrets.wncEMACasesLive;
+                                ContactUsTableMapping = secrets.WNCContactUsMappingTable;
                             }
                             else
                             {
@@ -173,6 +179,7 @@ namespace Email2CXM.Helpers
                                 cxmAPIName = secrets.cxmAPINameNorth;
                                 cxmAPICaseType = secrets.cxmAPICaseTypeNorthLive;
                                 tableName = secrets.nncEMNCasesLive;
+                                ContactUsTableMapping = secrets.NNCContactUsMappingTable;
                             }
 
                         }
@@ -185,6 +192,7 @@ namespace Email2CXM.Helpers
                                 cxmAPIName = secrets.cxmAPINameWest;
                                 cxmAPICaseType = secrets.cxmAPICaseTypeWest;
                                 tableName = secrets.wncEMACasesTest;
+                                ContactUsTableMapping = secrets.WNCContactUsMappingTable;
                             }
                             else
                             {
@@ -193,8 +201,8 @@ namespace Email2CXM.Helpers
                                 cxmAPIName = secrets.cxmAPINameNorth;
                                 cxmAPICaseType = secrets.cxmAPICaseTypeNorth;
                                 tableName = secrets.nncEMNCasesTest;
+                                ContactUsTableMapping = secrets.NNCContactUsMappingTable;
                             }
-
                         }
 
                         Random rand = new Random();
@@ -478,11 +486,10 @@ namespace Email2CXM.Helpers
                                 Console.WriteLine(caseNumber + " : Error updating CXM field " + fieldName + " with message : " + message);
                             }
 
-                            String unitary = await GetStringFieldFromDynamoAsync(caseReference, "Unitary");
+                            String unitary = await GetStringFieldFromDynamoAsync(caseReference, "Unitary", tableName);
 
                             if (unitary.Equals("true"))
                             {
-
                                 await TransitionCaseAsync("awaiting-location-confirmation");
                             }
                             else
@@ -494,57 +501,67 @@ namespace Email2CXM.Helpers
                         {
                             if (create)
                             {
-                                try
+                                String cxmSovereignServiceArea = "";
+                                if (contactUs)
                                 {
-                                    HttpClient client = new HttpClient();
-                                    Dictionary<String, Object> values;
-                                    values = new Dictionary<String, Object>
+                                    cxmSovereignServiceArea = await GetStringFieldFromDynamoAsync(serviceArea, "LexService", ContactUsTableMapping);
+                                    if (cxmSovereignServiceArea.ToLower().Contains("county"))
                                     {
-                                            { "first-name", firstName },
-                                            { "surname", lastName },
-                                            { "email", emailFrom },
-                                            { "subject", subject },
-                                            { "enquiry-details", parsedEmailUnencoded },
-                                            { "customer-has-updated", false },
-                                            { "unitary", unitary },
-                                            { "contact-us", contactUs },
-                                            { "telephone-number", telNo },
-                                            { "customer-address", address },
-                                            { "original-email", await TrimEmailContents(message.TextBody) }
+                                        district = false;
+                                    }
+                                    try
+                                    {
+                                        cxmSovereignServiceArea = cxmSovereignServiceArea.Substring(cxmSovereignServiceArea.IndexOf("_") + 1);
+                                    }
+                                    catch (Exception) { }                                   
+                                }
+
+                                Boolean success = true;
+
+                                if (contactUs)
+                                {
+                                    Dictionary<String, Object> values = new Dictionary<String, Object>
+                                    {
+                                        { "first-name", firstName },
+                                        { "surname", lastName },
+                                        { "email", emailFrom },
+                                        { "subject", subject },
+                                        { "enquiry-details", parsedEmailUnencoded },
+                                        { "customer-has-updated", false },
+                                        { "unitary", unitary },
+                                        { "contact-us", contactUs },
+                                        { "district", district },
+                                        { "telephone-number", telNo },
+                                        { "customer-address", address },
+                                        { "sovereign-service-area", cxmSovereignServiceArea },
+                                        { "original-email", await TrimEmailContents(message.TextBody) }
                                     };
-                                    if (!person.Equals(""))
+                                    success = await CreateCase(values, parsedEmailUnencoded, message, person, bundlerFound);
+                                    if (!success)
                                     {
-                                        values.Add("person", person);
+                                        Console.WriteLine("ERROR - Retrying case without cxmSovereignServiceArea of : " + cxmSovereignServiceArea);
                                     }
-                                    if (bundlerFound)
-                                    {
-                                        values.Add("merge-into-pdf", "yes");
-                                    }
-                                    else
-                                    {
-                                        values.Add("merge-into-pdf", "no");
-                                    }
-                                    String jsonContent = JsonConvert.SerializeObject(values);
-                                    HttpContent content = new StringContent(jsonContent);
-                                    Console.WriteLine($"Form Data2  : {jsonContent}");
-
-                                    HttpResponseMessage responseFromJadu = await client.PostAsync(cxmEndPoint + "/api/service-api/" + cxmAPIName + "/" + cxmAPICaseType + "/case/create?key=" + cxmAPIKey, content);
-
-                                    String responseString = await responseFromJadu.Content.ReadAsStringAsync();
-
-                                    Console.WriteLine($"Response from Jadu {responseString}");
-
-                                    dynamic jsonResponse = JObject.Parse(responseString);
-
-                                    caseReference = jsonResponse.reference;
-
-                                    Console.WriteLine($"Case Reference >>>{caseReference}<<<");
                                 }
-                                catch (Exception error)
+                                if(!contactUs||(contactUs&&!success))
                                 {
-                                    Console.WriteLine($"Error Response from Jadu {error.ToString()}");
+                                    Dictionary<String, Object> values = new Dictionary<String, Object>
+                                    {
+                                        { "first-name", firstName },
+                                        { "surname", lastName },
+                                        { "email", emailFrom },
+                                        { "subject", subject },
+                                        { "enquiry-details", parsedEmailUnencoded },
+                                        { "customer-has-updated", false },
+                                        { "unitary", unitary },
+                                        { "contact-us", contactUs },
+                                        { "district", district },
+                                        { "telephone-number", telNo },
+                                        { "customer-address", address },
+                                        { "original-email", await TrimEmailContents(message.TextBody) }
+                                    };
+                                    await CreateCase(values, parsedEmailUnencoded, message, person, bundlerFound);
                                 }
-
+                                
                                 responseFileName = "email-no-faq.txt";
 
                                 await StoreContactToDynamoAsync(caseReference, parsedEmailUnencoded, unitary);
@@ -600,6 +617,50 @@ namespace Email2CXM.Helpers
             return true;
         }
 
+        private async Task<Boolean> CreateCase(Dictionary<String, Object> values, String parsedEmailUnencoded, MimeMessage message, String person, Boolean bundlerFound)
+        {
+            try
+            {
+                HttpClient client = new HttpClient();
+                if (!person.Equals(""))
+                {
+                    values.Add("person", person);
+                }
+                if (bundlerFound)
+                {
+                    values.Add("merge-into-pdf", "yes");
+                }
+                else
+                {
+                    values.Add("merge-into-pdf", "no");
+                }
+                String jsonContent = JsonConvert.SerializeObject(values);
+                HttpContent content = new StringContent(jsonContent);
+                Console.WriteLine($"Form Data2  : {jsonContent}");
+                HttpResponseMessage responseFromJadu = await client.PostAsync(cxmEndPoint + "/api/service-api/" + cxmAPIName + "/" + cxmAPICaseType + "/case/create?key=" + cxmAPIKey, content);
+                String responseString = await responseFromJadu.Content.ReadAsStringAsync();
+                Console.WriteLine($"Response from Jadu {responseString}");
+
+                if (responseFromJadu.IsSuccessStatusCode)
+                {               
+                    dynamic jsonResponse = JObject.Parse(responseString);
+                    caseReference = jsonResponse.reference;
+                    Console.WriteLine($"Case Reference >>>{caseReference}<<<");
+                }
+                else
+                {
+                    Console.WriteLine($"ERROR - No case created : " + responseFromJadu.StatusCode);
+                    return false;
+                }
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine($"Error Response from Jadu {error.ToString()}");
+                return false;
+            }
+            return true;
+        }
+
         private async Task<String> GetSignatureFromDynamoAsync(String domain, String sigSuffix)
         {
             Console.WriteLine("GetSignatureFromDynamoAsync : Checking for known email signature for : " + domain + " " + sigSuffix);
@@ -625,23 +686,23 @@ namespace Email2CXM.Helpers
 
         }
 
-        private async Task<String> GetStringFieldFromDynamoAsync(String caseReference, String field)
+        private async Task<String> GetStringFieldFromDynamoAsync(String key, String field, String tableName)
         {
             try
             {
                 AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);
-                Table productCatalog = Table.LoadTable(dynamoDBClient, tableName);
+                Table table = Table.LoadTable(dynamoDBClient, tableName);
                 GetItemOperationConfig config = new GetItemOperationConfig
                 {
                     AttributesToGet = new List<String> { field },
                     ConsistentRead = true
                 };
-                Document document = await productCatalog.GetItemAsync(caseReference, config);
+                Document document = await table.GetItemAsync(key, config);
                 return document[field].AsPrimitive().Value.ToString();
             }
             catch (Exception error)
             {
-                Console.WriteLine("ERROR : GetContactFromDynamoAsync : " + error.Message);
+                Console.WriteLine("ERROR : GetStringFieldFromDynamoAsync : " + error.Message);
                 Console.WriteLine(error.StackTrace);
                 return "";
             }
@@ -816,5 +877,7 @@ namespace Email2CXM.Helpers
         public String wncEMACasesTest { get; set; }
         public String nncEMNCasesLive { get; set; }
         public String nncEMNCasesTest { get; set; }
+        public String WNCContactUsMappingTable { get; set; }
+        public String NNCContactUsMappingTable { get; set; }
     }
 }
