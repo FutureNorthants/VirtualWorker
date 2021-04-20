@@ -58,6 +58,7 @@ namespace CheckForLocation
         private Boolean district = true;
         private Boolean west = true;
         private Boolean preventOutOfArea = true;
+        private Boolean defaultRouting = false;
 
         private Secrets secrets = null;
 
@@ -71,6 +72,7 @@ namespace CheckForLocation
                 district = true;
                 west = true;
                 preventOutOfArea = true;
+                defaultRouting = false;
 
                 templateBucket = secrets.templateBucketTest;
                 sqsEmailURL = secrets.sqsEmailURLTest;
@@ -257,6 +259,11 @@ namespace CheckForLocation
                     catch (Exception) { }
                     try
                     {
+                        caseDetails.District = (Boolean)caseSearch.SelectToken("values.district");
+                    }
+                    catch (Exception) { }
+                    try
+                    {
                         caseDetails.customerAddress = (String)caseSearch.SelectToken("values.customer_address");
                     }
                     catch (Exception) { }
@@ -306,10 +313,11 @@ namespace CheckForLocation
                         if (String.IsNullOrEmpty(forwardingEmailAddress))
                         {
                             forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
+                            defaultRouting = true;
                         }
                         success = await SendEmails(caseDetails, forwardingEmailAddress, true);
                         caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
-                        if (caseDetails.sovereignCouncil.ToLower().Equals("northampton"))
+                        if (caseDetails.sovereignCouncil.ToLower().Equals("northampton")&&!defaultRouting)
                         {
                             await TransitionCaseAsync("awaiting-review");
                         }
@@ -350,6 +358,7 @@ namespace CheckForLocation
                         else
                         {
                             Console.WriteLine(caseReference + " : SovereignServiceArea not set using Lex ");
+                            district = caseDetails.District;
                             service = await GetServiceAsync(originalEmail);
                         }                      
 
@@ -388,7 +397,7 @@ namespace CheckForLocation
                             } else
                             {
                                 success = await SendEmails(caseDetails, forwardingEmailAddress, true);                               
-                                if (west && sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton"))
+                                if (west && sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton")&&defaultRouting)
                                 {
                                     UpdateCase("email-comments", "Transitioning case to local process");
                                     await TransitionCaseAsync("awaiting-review");
@@ -999,9 +1008,9 @@ namespace CheckForLocation
             Console.WriteLine(caseReference + " : Sending forward email");
  
 
-            if (sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton"))
+            if (sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton")&&defaultRouting)
             {
-                Console.WriteLine(caseReference + " : Local case no forward necessary");
+                Console.WriteLine(caseReference + " : Local default case no forward necessary");
             }
             else
             {
@@ -1151,6 +1160,7 @@ namespace CheckForLocation
         public Boolean customerHasUpdated { get; set; } = false;
         public Boolean manualReview { get; set; } = false;
         public Boolean contactUs { get; set; } = false;
+        public Boolean District { get; set; } = false;
     }
 
     public class Secrets

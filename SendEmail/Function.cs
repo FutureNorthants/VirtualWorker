@@ -34,7 +34,7 @@ namespace SendEmail
 
             if (await GetSecrets())
             {
-               try
+                try
                 {
                     if (context.InvokedFunctionArn.ToLower().Contains("prod"))
                     {
@@ -44,6 +44,8 @@ namespace SendEmail
                 catch (Exception)
                 {
                 }
+
+                context.Logger.LogLine("NorbertSendFrom : " + norbertSendFrom);
 
                 foreach (var message in evnt.Records)
                 {
@@ -56,13 +58,6 @@ namespace SendEmail
         {
             message.MessageAttributes.TryGetValue("To", out MessageAttribute toEmail);
             message.MessageAttributes.TryGetValue("Subject", out MessageAttribute subject);
-            String replyTo=null;
-            try {
-                message.MessageAttributes.TryGetValue("ReplyTo", out MessageAttribute tempReplyTo);
-                replyTo = tempReplyTo.StringValue;
-            }
-            catch (Exception) { }
-                   
             norbertSendFrom = secrets.norbertSendFromTest;
             context.Logger.LogLine("Finding SendFrom");
             if (subject.StringValue.ToLower().Contains("ema"))
@@ -91,17 +86,6 @@ namespace SendEmail
                     context.Logger.LogLine("Sending from NNC Test : " + norbertSendFrom);
                 }
             }
-            List<string> replyToList;
-            if (String.IsNullOrEmpty(replyTo))
-            {
-                replyToList = new List<string> { norbertSendFrom };
-                context.Logger.LogLine("ReplyTo is : " + norbertSendFrom);
-            }
-            else
-            {
-                replyToList = new List<string> { replyTo};
-                context.Logger.LogLine("ReplyTo is : " + replyTo);
-            }
             context.Logger.LogLine("Sending email to " + toEmail.StringValue + " with subject of : " + subject.StringValue);
             String messageBody = message.Body;
             Random rand = new Random();
@@ -119,7 +103,6 @@ namespace SendEmail
                 {
 
                     Source = norbertSendFrom,
-                    ReplyToAddresses = replyToList,
                     Destination = new Destination
                     {
                         ToAddresses = new List<string> { toEmail.StringValue },
