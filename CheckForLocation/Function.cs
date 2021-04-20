@@ -349,16 +349,16 @@ namespace CheckForLocation
                             sovereignLocation = await CheckForLocationAsync(caseDetails.customerAddress);
                         }
                         String service = "";
+                        district = caseDetails.District;
 
                         if (caseDetails.contactUs&&!String.IsNullOrEmpty(caseDetails.sovereignServiceArea))
                         {
-                            Console.WriteLine(caseReference + " : SovereignServiceArea set using  : " + caseDetails.sovereignServiceArea);
+                            Console.WriteLine(caseReference + " : SovereignServiceArea set using  : " + caseDetails.sovereignServiceArea);                           
                             service = caseDetails.sovereignServiceArea;
                         }
                         else
                         {
                             Console.WriteLine(caseReference + " : SovereignServiceArea not set using Lex ");
-                            district = caseDetails.District;
                             service = await GetServiceAsync(originalEmail);
                         }                      
 
@@ -382,6 +382,7 @@ namespace CheckForLocation
                             if (String.IsNullOrEmpty(forwardingEmailAddress))
                             {
                                 forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(sovereignCouncilName, "default");
+                                defaultRouting = true;
                             }
                             UpdateCase("sovereign-council", sovereignLocation.SovereignCouncilName);
                             if (preventOutOfArea && west && !sovereignLocation.sovereignWest)
@@ -501,7 +502,6 @@ namespace CheckForLocation
                     emailBody = reader.ReadToEnd();
                 }
                 emailBody = emailBody.Replace("AAA", caseReference);
-                //emailBody = emailBody.Replace("KKK", caseDetails.customerEmail);
                 emailBody = emailBody.Replace("ZZZ", caseDetails.enquiryDetails);
                
                 if (String.IsNullOrEmpty(caseDetails.fullEmail))
@@ -544,6 +544,10 @@ namespace CheckForLocation
                     {
                         emailBody = emailBody.Replace("TTT", "");
                     }
+                }
+                else
+                {
+                    emailBody = emailBody.Replace("KKK", caseDetails.customerEmail);
                 }
             }
             catch (Exception error)
@@ -1143,6 +1147,7 @@ namespace CheckForLocation
             }
             await Task.CompletedTask;
         }
+
     }
 
     public class CaseDetails
@@ -1225,4 +1230,5 @@ namespace CheckForLocation
         public Boolean west = false;
         public String SovereignCouncilName = "";
     }
+
 }
