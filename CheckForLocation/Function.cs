@@ -59,6 +59,7 @@ namespace CheckForLocation
         private Boolean west = true;
         private Boolean preventOutOfArea = true;
         private Boolean defaultRouting = false;
+        private Boolean outOfArea = false;
 
         private Secrets secrets = null;
 
@@ -73,6 +74,7 @@ namespace CheckForLocation
                 west = true;
                 preventOutOfArea = true;
                 defaultRouting = false;
+                outOfArea = false;
 
                 templateBucket = secrets.templateBucketTest;
                 sqsEmailURL = secrets.sqsEmailURLTest;
@@ -397,6 +399,11 @@ namespace CheckForLocation
                                 await TransitionCaseAsync("hub-awaiting-review");
                             } else
                             {
+                                if((west && !sovereignLocation.sovereignWest)||(!west && sovereignLocation.sovereignWest))
+                                {
+                                    UpdateCase("email-comments", "Contact destination out of area");
+                                    outOfArea = true;
+                                }
                                 success = await SendEmails(caseDetails, forwardingEmailAddress, true);                               
                                 if (west && sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton")&&defaultRouting)
                                 {
@@ -988,10 +995,21 @@ namespace CheckForLocation
             if (replyToCustomer)
             {
                 Console.WriteLine(caseReference + " : Sending confirmation email");
-                emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
+                String subject = "";
+                if (outOfArea)
+                {
+                    emailBody = await FormatEmailAsync(caseDetails, "sovereign-misdirect-acknowledge.txt");
+                    subject = orgName + " : We have redirected your enquiry";
+                }
+                else
+                {
+                    emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
+                    subject = orgName + " : Your Call Number is " + caseReference;
+                }
+                
                 if (!String.IsNullOrEmpty(emailBody))
                 {
-                    if (!await SendMessageAsync(orgName + " : Your Call Number is " + caseReference, caseDetails.customerEmail, norbertSendFrom, emailBody, caseDetails))
+                    if (!await SendMessageAsync(subject, caseDetails.customerEmail, norbertSendFrom, emailBody, caseDetails))
                     {
                         Console.WriteLine(caseReference + " : ERROR : Failed to send confirmation email");
                         UpdateCase("email-comments", "Failed to send confirmation email to " + caseDetails.customerEmail);
