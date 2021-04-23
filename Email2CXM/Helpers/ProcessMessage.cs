@@ -533,6 +533,7 @@ namespace Email2CXM.Helpers
                                         { "district", district },
                                         { "telephone-number", telNo },
                                         { "customer-address", address },
+                                        { "email-id", keyName},
                                         { "sovereign-service-area", cxmSovereignServiceArea },
                                         { "original-email", await TrimEmailContents(message.TextBody) }
                                     };
@@ -557,6 +558,7 @@ namespace Email2CXM.Helpers
                                         { "district", district },
                                         { "telephone-number", telNo },
                                         { "customer-address", address },
+                                        { "email-id", keyName},
                                         { "original-email", await TrimEmailContents(message.TextBody) }
                                     };
                                     await CreateCase(values, parsedEmailUnencoded, message, person, bundlerFound);

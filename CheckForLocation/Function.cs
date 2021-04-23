@@ -58,6 +58,8 @@ namespace CheckForLocation
         private static String orgName;
         private static String nncSovereignEmailTable;
         private static String norbertSendFrom;
+        private static String emailBucket;
+        private static String bccEmailAddress;
 
         private Boolean liveInstance = false;
         private Boolean district = true;
@@ -74,7 +76,6 @@ namespace CheckForLocation
         {
             if (await GetSecrets())
             {
-                await TestSendEmailsAsync();
                 liveInstance = false;
                 district = true;
                 west = true;
@@ -117,7 +118,10 @@ namespace CheckForLocation
                         cxmAPIKey = secrets.cxmAPIKeyLive;
                         templateBucket = secrets.templateBucketLive;
                         cxmAPIName = secrets.cxmAPINameWest;
+                        orgName = secrets.wncOrgName;
                         norbertSendFrom = secrets.norbertSendFromLive;
+                        emailBucket = secrets.WncEmailBucketLive;
+                        bccEmailAddress = secrets.WncBccAddressLive;
                         try
                         {
                             if (secrets.wncPreventOutOfAreaLive.ToLower().Equals("false"))
@@ -137,7 +141,10 @@ namespace CheckForLocation
                         templateBucket = secrets.nncTemplateBucketLive;
                         cxmAPIName = secrets.cxmAPINameNorth;
                         nncSovereignEmailTable = secrets.nncSovereignEmailTableLive;
+                        orgName = secrets.nncOrgName;
                         norbertSendFrom = secrets.nncSendFromLive;
+                        emailBucket = secrets.NncEmailBucketLive;
+                        bccEmailAddress = secrets.NncBccAddressLive;
                         try
                         {
                             if (secrets.nncPreventOutOfAreaLive.ToLower().Equals("false"))
@@ -167,6 +174,8 @@ namespace CheckForLocation
                         cxmAPIName = secrets.cxmAPINameWest;
                         orgName = secrets.wncOrgName;
                         norbertSendFrom = secrets.norbertSendFromTest;
+                        emailBucket = secrets.WncEmailBucketTest;
+                        bccEmailAddress = secrets.WncBccAddressTest;
                         try
                         {
                             if (secrets.wncPreventOutOfAreaTest.ToLower().Equals("false"))
@@ -188,6 +197,8 @@ namespace CheckForLocation
                         orgName = secrets.nncOrgName;
                         nncSovereignEmailTable = secrets.nncSovereignEmailTableTest;
                         norbertSendFrom = secrets.nncSendFromTest;
+                        emailBucket = secrets.NncEmailBucketTest;
+                        bccEmailAddress = secrets.NncBccAddressTest;
                         try
                         {
                             if (secrets.nncPreventOutOfAreaTest.ToLower().Equals("false"))
@@ -278,6 +289,11 @@ namespace CheckForLocation
                     try
                     {
                         caseDetails.telephoneNumber = (String)caseSearch.SelectToken("values.telephone_number");
+                    }
+                    catch (Exception) { }
+                    try
+                    {
+                        caseDetails.emailID = (String)caseSearch.SelectToken("values.email_id");
                     }
                     catch (Exception) { }
                     if (caseReference.ToLower().Contains("emn"))
@@ -408,6 +424,14 @@ namespace CheckForLocation
                                 if((west && !sovereignLocation.sovereignWest)||(!west && sovereignLocation.sovereignWest))
                                 {
                                     UpdateCase("email-comments", "Contact destination out of area");
+                                    if (west)
+                                    {
+                                        forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync("nnc", "default");
+                                    }
+                                    else
+                                    {
+                                        forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync("wnc", "default");
+                                    }                                  
                                     outOfArea = true;
                                 }
                                 success = await SendEmails(caseDetails, forwardingEmailAddress, true);                               
@@ -1067,7 +1091,7 @@ namespace CheckForLocation
                         }
                         subjectPrefix += "TEST - ";
                     }
-                    if (!await SendMessageAsync(subjectPrefix + "Hub case reference number is " + caseReference, forwardingEmailAddress.ToLower(), caseDetails.customerEmail, emailBody, caseDetails))
+                    if (!await SendEmailAsync(orgName,norbertSendFrom, forwardingEmailAddress.ToLower(), bccEmailAddress,subjectPrefix + "Hub case reference number is " + caseReference, caseDetails.emailID, emailBody, ""))
                     {
                         Console.WriteLine(caseReference + " : ERROR : Failed to forward email");
                         UpdateCase("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
@@ -1172,54 +1196,54 @@ namespace CheckForLocation
             await Task.CompletedTask;
         }
 
-        public async Task TestSendEmailsAsync()
+        public async Task<Boolean> SendEmailAsync(String from, String fromAddress, String toAddress, String bccAddress, String subject, String emailID, String htmlBody, String textBody)
         {
-
             using (var client = new AmazonSimpleEmailServiceClient(RegionEndpoint.EUWest1))
             {
-                var sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync()) };
+                var sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, textBody, bccAddress)) };
                 try
                 {
                     SendRawEmailResponse response = await client.SendRawEmailAsync(sendRequest);
-                    Console.WriteLine("The email was sent successfully.");
+                    return true;
                 }
-                catch (Exception e)
+                catch (Exception error)
                 {
-                    Console.WriteLine("The email was not sent.");
-                    Console.WriteLine("Error message: " + e.Message);
+                    Console.WriteLine(caseReference + " : Error Sending Raw Email : " + error.Message);
+                    return false;
                 }
             }
         }
 
-        private static async Task<MemoryStream> GetMessageStreamAsync()
+        private static async Task<MemoryStream> GetMessageStreamAsync(String from, String fromAddress, String toAddress, String subject,String emailID, String htmlBody, String textBody, String bccAddress)
         {
             MemoryStream stream = new MemoryStream();
-            MimeMessage message = await GetMessageAsync();
+            MimeMessage message = await GetMessageAsync(from,fromAddress,toAddress,subject,emailID, htmlBody, textBody, bccAddress);
             message.WriteTo(stream);
             return stream;
         }
 
-        private static async Task<MimeMessage> GetMessageAsync()
+        private static async Task<MimeMessage> GetMessageAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress)
         {
             MimeMessage message = new MimeMessage();
-            message.From.Add(new MailboxAddress("Foo Bar", "updateus@northampton.digital"));
-            message.To.Add(new MailboxAddress(string.Empty, "kevin.white@westnorthants.gov.uk"));
-            message.Subject = "Amazon SES Test";
-            BodyBuilder bodyBuilder = await GetMessageBodyAsync();
+            message.From.Add(new MailboxAddress(from,fromAddress));
+            message.To.Add(new MailboxAddress(string.Empty, toAddress));
+            message.Bcc.Add(new MailboxAddress(string.Empty, bccAddress));
+            message.Subject = subject;
+            BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody);
             message.Body = bodyBuilder.ToMessageBody();
             return message;
         }
 
-        private static async Task<BodyBuilder> GetMessageBodyAsync()
+        private static async Task<BodyBuilder> GetMessageBodyAsync(String emailID, String htmlBody, String textBody)
         {
             var body = new BodyBuilder()
             {
-                HtmlBody = @"<p>Amazon SES Test body</p>",
-                TextBody = "Amazon SES Test body",
+                HtmlBody = @htmlBody,
+                TextBody = textBody
             };
 
             AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
-            GetObjectResponse image = await s3.GetObjectAsync("norbert.emails.test", "063l7eupvbjp67a2747g4s66ca1sff06ju4hi9o1");
+            GetObjectResponse image = await s3.GetObjectAsync(emailBucket, emailID);
             byte[] imageBytes = new byte[image.ContentLength];
             using (MemoryStream ms = new MemoryStream())
             {
@@ -1232,7 +1256,7 @@ namespace CheckForLocation
                 try
                 {
                     imageBytes = ms.ToArray();
-                    body.Attachments.Add("wibble.eml",imageBytes);
+                    body.Attachments.Add(caseReference + ".eml",imageBytes);
                 }
                 catch (Exception error)
                 {
@@ -1240,29 +1264,6 @@ namespace CheckForLocation
                 }
                 return body;
             }
-        }
-
- 
-
-        private static async Task<MemoryStream> GetEmailAsync()
-        {
-            //byte[] imageBytes = new byte[s3Event.Object.Size];
-            //byte[] imageBytes;
-
-            AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
-            GetObjectResponse image = await s3.GetObjectAsync("norbert.emails.test", "063l7eupvbjp67a2747g4s66ca1sff06ju4hi9o1");
-            using (MemoryStream ms = new MemoryStream())
-            {
-                int read;
-                byte[] buffer = new byte[16 * 1024];
-                while ((read = image.ResponseStream.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    ms.Write(buffer, 0, read);
-                }
-                return ms;
-                //imageBytes = ms.ToArray();
-            }
-            
         }
     }
 
@@ -1280,6 +1281,7 @@ namespace CheckForLocation
         public String nncForwardEMailTo { get; set; } = "";
         public String customerAddress { get; set; } = "";
         public String telephoneNumber { get; set; } = "";
+        public String emailID { get; set; } = "";
         public Boolean customerHasUpdated { get; set; } = false;
         public Boolean manualReview { get; set; } = false;
         public Boolean contactUs { get; set; } = false;
@@ -1330,6 +1332,14 @@ namespace CheckForLocation
         public String nncPreventOutOfAreaTest { get; set; }
         public String wncPreventOutOfAreaLive { get; set; }
         public String wncPreventOutOfAreaTest { get; set; }
+        public String WncEmailBucketLive { get; set; }
+        public String WncEmailBucketTest { get; set; }
+        public String NncEmailBucketLive { get; set; }
+        public String NncEmailBucketTest { get; set; }
+        public String WncBccAddressTest { get; set; }
+        public String WncBccAddressLive { get; set; }
+        public String NncBccAddressTest { get; set; }
+        public String NncBccAddressLive { get; set; }
     }
 
     public class Location
