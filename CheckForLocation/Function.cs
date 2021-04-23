@@ -9,10 +9,13 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
+using Amazon.SimpleEmail;
+using Amazon.SimpleEmail.Model;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using Amazon.StepFunctions;
 using Amazon.StepFunctions.Model;
+using MimeKit;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -22,6 +25,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 
@@ -34,6 +38,7 @@ namespace CheckForLocation
         private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
         private static readonly RegionEndpoint bucketRegion = RegionEndpoint.EUWest2;
         private static readonly RegionEndpoint sqsRegion = RegionEndpoint.EUWest1;
+        private static readonly RegionEndpoint emailsRegion = RegionEndpoint.EUWest1;
         private static readonly String secretName = "nbcGlobal";
         private static readonly String secretAlias = "AWSCURRENT";
 
@@ -69,6 +74,7 @@ namespace CheckForLocation
         {
             if (await GetSecrets())
             {
+                await TestSendEmailsAsync();
                 liveInstance = false;
                 district = true;
                 west = true;
@@ -1166,7 +1172,101 @@ namespace CheckForLocation
             await Task.CompletedTask;
         }
 
+        public async Task TestSendEmailsAsync()
+        {
+
+            using (var client = new AmazonSimpleEmailServiceClient(RegionEndpoint.EUWest1))
+            {
+                var sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync()) };
+                try
+                {
+                    SendRawEmailResponse response = await client.SendRawEmailAsync(sendRequest);
+                    Console.WriteLine("The email was sent successfully.");
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("The email was not sent.");
+                    Console.WriteLine("Error message: " + e.Message);
+                }
+            }
+        }
+
+        private static async Task<MemoryStream> GetMessageStreamAsync()
+        {
+            MemoryStream stream = new MemoryStream();
+            MimeMessage message = await GetMessageAsync();
+            message.WriteTo(stream);
+            return stream;
+        }
+
+        private static async Task<MimeMessage> GetMessageAsync()
+        {
+            MimeMessage message = new MimeMessage();
+            message.From.Add(new MailboxAddress("Foo Bar", "updateus@northampton.digital"));
+            message.To.Add(new MailboxAddress(string.Empty, "kevin.white@westnorthants.gov.uk"));
+            message.Subject = "Amazon SES Test";
+            BodyBuilder bodyBuilder = await GetMessageBodyAsync();
+            message.Body = bodyBuilder.ToMessageBody();
+            return message;
+        }
+
+        private static async Task<BodyBuilder> GetMessageBodyAsync()
+        {
+            var body = new BodyBuilder()
+            {
+                HtmlBody = @"<p>Amazon SES Test body</p>",
+                TextBody = "Amazon SES Test body",
+            };
+
+            AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
+            GetObjectResponse image = await s3.GetObjectAsync("norbert.emails.test", "063l7eupvbjp67a2747g4s66ca1sff06ju4hi9o1");
+            byte[] imageBytes = new byte[image.ContentLength];
+            using (MemoryStream ms = new MemoryStream())
+            {
+                int read;
+                byte[] buffer = new byte[16 * 1024];
+                while ((read = image.ResponseStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    ms.Write(buffer, 0, read);
+                }
+                try
+                {
+                    imageBytes = ms.ToArray();
+                    body.Attachments.Add("wibble.eml",imageBytes);
+                }
+                catch (Exception error)
+                {
+
+                }
+                return body;
+            }
+        }
+
+ 
+
+        private static async Task<MemoryStream> GetEmailAsync()
+        {
+            //byte[] imageBytes = new byte[s3Event.Object.Size];
+            //byte[] imageBytes;
+
+            AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
+            GetObjectResponse image = await s3.GetObjectAsync("norbert.emails.test", "063l7eupvbjp67a2747g4s66ca1sff06ju4hi9o1");
+            using (MemoryStream ms = new MemoryStream())
+            {
+                int read;
+                byte[] buffer = new byte[16 * 1024];
+                while ((read = image.ResponseStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    ms.Write(buffer, 0, read);
+                }
+                return ms;
+                //imageBytes = ms.ToArray();
+            }
+            
+        }
     }
+
+}
 
     public class CaseDetails
     {
@@ -1248,5 +1348,3 @@ namespace CheckForLocation
         public Boolean west = false;
         public String SovereignCouncilName = "";
     }
-
-}

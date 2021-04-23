@@ -14,9 +14,11 @@
     <PackageReference Include="AWSSDK.Lex" Version="3.7.1.1" />
     <PackageReference Include="AWSSDK.S3" Version="3.7.0.8" />
     <PackageReference Include="AWSSDK.SecretsManager" Version="3.7.0.7" />
+    <PackageReference Include="AWSSDK.SimpleEmail" Version="3.7.0.7" />
     <PackageReference Include="AWSSDK.SQS" Version="3.7.0.8" />
     <PackageReference Include="AWSSDK.StepFunctions" Version="3.7.0.7" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.32" />
+    <PackageReference Include="MimeKit" Version="2.11.0" />
     <PackageReference Include="System.Net.Http.Json" Version="5.0.0" />
   </ItemGroup>
 </Project>
