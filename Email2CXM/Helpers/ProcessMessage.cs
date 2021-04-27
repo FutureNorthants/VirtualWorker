@@ -415,9 +415,9 @@ namespace Email2CXM.Helpers
                         }
                     }
 
-                    if (emailFrom.Contains(secrets.loopPreventIdentifier))
+                    if (emailFrom.Contains(secrets.loopPreventIdentifier) || (emailTo.ToLower().Contains("update") &&(emailFrom.ToLower().Contains("westnorthants.gov.uk") || emailFrom.ToLower().Contains("northnorthants.gov.uk"))))
                     {
-                        Console.WriteLine(emailFrom + " - Loop identifier found - no case created or updated : " + secrets.loopPreventIdentifier);
+                        Console.WriteLine(emailFrom + " - Loop identifier found - no case created or updated : " + keyName);
                     }
                     else
                     {
