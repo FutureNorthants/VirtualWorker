@@ -35,6 +35,7 @@ namespace GetFAQResponse
         private static CaseDetails caseDetails;
         private Secrets secrets = null;
         private Boolean liveInstance = false;
+        private Boolean west = true;
 
         private static int minConfidenceLevel;
         private static int minAutoRespondLevel;
@@ -126,6 +127,7 @@ namespace GetFAQResponse
                         }
                         if (caseReference.ToLower().Contains("emn"))
                         {
+                            west = false;
                             tableName = secrets.nncEMNCasesLive;
                             cxmEndPoint = secrets.cxmEndPointLiveNorth;
                             cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
@@ -149,6 +151,7 @@ namespace GetFAQResponse
                         }
                         if (caseReference.ToLower().Contains("emn"))
                         {
+                            west = false;
                             tableName = secrets.nncEMNCasesTest;
                             cxmEndPoint = secrets.cxmEndPointTestNorth;
                             cxmAPIKey = secrets.cxmAPIKeyTestNorth;
@@ -156,10 +159,19 @@ namespace GetFAQResponse
                         }
 
                         caseDetails = await GetCaseDetailsAsync();
-                        if (await GetProposedResponse() && await UpdateCaseDetailsAsync() && await TransitionCaseAsync())
+                        if (west)
                         {
+                            if (await GetProposedResponse() && await UpdateCaseDetailsAsync() && await TransitionCaseAsync())
+                            {
+                                await SendSuccessAsync();
+                            }
+                        }
+                        else
+                        {
+                            await TransitionCaseAsync();
                             await SendSuccessAsync();
                         }
+   
                     }
                 }
             }
