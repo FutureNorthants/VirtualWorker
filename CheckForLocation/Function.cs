@@ -222,9 +222,11 @@ namespace CheckForLocation
         {
             IAmazonSecretsManager client = new AmazonSecretsManagerClient(primaryRegion);
 
-            GetSecretValueRequest request = new GetSecretValueRequest();
-            request.SecretId = secretName;
-            request.VersionStage = secretAlias;
+            GetSecretValueRequest request = new GetSecretValueRequest
+            {
+                SecretId = secretName,
+                VersionStage = secretAlias
+            };
 
             try
             {
@@ -244,8 +246,10 @@ namespace CheckForLocation
         private async Task<CaseDetails> GetCaseDetailsAsync()
         {
             CaseDetails caseDetails = new CaseDetails();
-            HttpClient cxmClient = new HttpClient();
-            cxmClient.BaseAddress = new Uri(cxmEndPoint);
+            HttpClient cxmClient = new HttpClient
+            {
+                BaseAddress = new Uri(cxmEndPoint)
+            };
             string requestParameters = "key=" + cxmAPIKey;
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "?" + requestParameters);
             try
