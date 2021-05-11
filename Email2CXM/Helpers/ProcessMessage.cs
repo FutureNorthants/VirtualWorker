@@ -105,7 +105,7 @@ namespace Email2CXM.Helpers
                         {
                             Console.WriteLine(emailFrom + " - Create Case");
                         }
-                        if (emailTo.ToLower().Contains("unitary") || emailTo.ToLower().Contains("westnorthants") || emailTo.ToLower().Contains("northnorthants") || emailFrom.ToLower().Contains("noreply@northamptonshire.gov.uk"))
+                        if(emailTo.ToLower().Equals(await GetStringFieldFromDynamoAsync(emailTo.ToLower(),"email", "UnitaryEmailAddresses")))
                         {
                             unitary = true;
                         }

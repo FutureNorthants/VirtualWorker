@@ -260,7 +260,7 @@ namespace CheckForLocation
                     HttpContent responseContent = response.Content;
                     String responseString = responseContent.ReadAsStringAsync().Result;
                     JObject caseSearch = JObject.Parse(responseString);
-                    caseDetails.customerName = (String)caseSearch.SelectToken("values.first-name") + " " + (String)caseSearch.SelectToken("values.surname");
+                    caseDetails.customerName = (String)caseSearch.SelectToken("values.first_name") + " " + (String)caseSearch.SelectToken("values.surname");
                     try
                     {
                         caseDetails.manualReview = (Boolean)caseSearch.SelectToken("values.manual_review");
