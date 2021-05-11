@@ -222,9 +222,11 @@ namespace CheckForLocation
         {
             IAmazonSecretsManager client = new AmazonSecretsManagerClient(primaryRegion);
 
-            GetSecretValueRequest request = new GetSecretValueRequest();
-            request.SecretId = secretName;
-            request.VersionStage = secretAlias;
+            GetSecretValueRequest request = new GetSecretValueRequest
+            {
+                SecretId = secretName,
+                VersionStage = secretAlias
+            };
 
             try
             {
@@ -244,8 +246,10 @@ namespace CheckForLocation
         private async Task<CaseDetails> GetCaseDetailsAsync()
         {
             CaseDetails caseDetails = new CaseDetails();
-            HttpClient cxmClient = new HttpClient();
-            cxmClient.BaseAddress = new Uri(cxmEndPoint);
+            HttpClient cxmClient = new HttpClient
+            {
+                BaseAddress = new Uri(cxmEndPoint)
+            };
             string requestParameters = "key=" + cxmAPIKey;
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "?" + requestParameters);
             try
@@ -305,6 +309,7 @@ namespace CheckForLocation
                     {
                         caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
                         caseDetails.nncForwardEMailTo = GetStringValueFromJSON(caseSearch, "values.forward_email_to");
+                        caseDetails.contactUs = (Boolean)caseSearch.SelectToken("values.emn_contact_us");
                     }
                     caseDetails.enquiryDetails = (String)caseSearch.SelectToken("values.enquiry_details");
                     caseDetails.customerHasUpdated = (Boolean)caseSearch.SelectToken("values.customer_has_updated");
@@ -545,7 +550,8 @@ namespace CheckForLocation
                 }
                 emailBody = emailBody.Replace("AAA", caseReference);
                 emailBody = emailBody.Replace("ZZZ", caseDetails.enquiryDetails);
-               
+                emailBody = emailBody.Replace("GGG", caseDetails.customerName);
+
                 if (String.IsNullOrEmpty(caseDetails.fullEmail))
                 {
                     emailBody = emailBody.Replace("OOO", HttpUtility.HtmlEncode(caseDetails.enquiryDetails));
@@ -1141,7 +1147,7 @@ namespace CheckForLocation
                 else
                 {
                     Console.WriteLine(caseReference + "ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
-                    UpdateCaseString("email-comments", "Failed to forward email to " + caseDetails.customerEmail);
+                    UpdateCaseString("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
                     await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");                   
                     return false;
                 }

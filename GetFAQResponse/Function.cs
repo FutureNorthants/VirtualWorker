@@ -103,12 +103,13 @@ namespace GetFAQResponse
                 {
                     JObject o = JObject.Parse(input.ToString());
                     caseReference = (string)o.SelectToken("CaseReference");
+                    Console.WriteLine(caseReference + " : Started");
                     taskToken = (string)o.SelectToken("TaskToken");
                     try
                     {
                         if (context.InvokedFunctionArn.ToLower().Contains("prod"))
                         {
-                            Console.WriteLine("Prod version");
+                            Console.WriteLine(caseReference + " : Prod version");
                             liveInstance = true;
                         }
                     }
@@ -135,8 +136,16 @@ namespace GetFAQResponse
                         }
 
                         caseDetails = await GetCaseDetailsAsync();
-                        if (await GetProposedResponse() && await UpdateCaseDetailsAsync() && await TransitionCaseAsync())
+                        if (west)
                         {
+                            if (await GetProposedResponse() && await UpdateCaseDetailsAsync() && await TransitionCaseAsync())
+                            {
+                                await SendSuccessAsync();
+                            }
+                        }
+                        else
+                        {
+                            await TransitionCaseAsync();
                             await SendSuccessAsync();
                         }
                     }
@@ -171,7 +180,6 @@ namespace GetFAQResponse
                             await TransitionCaseAsync();
                             await SendSuccessAsync();
                         }
-   
                     }
                 }
             }
