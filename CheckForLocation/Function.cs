@@ -419,6 +419,7 @@ namespace CheckForLocation
                                 defaultRouting = true;
                             }
                             UpdateCaseString("sovereign-council", sovereignLocation.SovereignCouncilName);
+                            caseDetails.sovereignCouncil = sovereignLocation.SovereignCouncilName;
                             if (preventOutOfArea && west && !sovereignLocation.sovereignWest)
                             {
                                 UpdateCaseString("email-comments", "Contact destination out of area");
@@ -1102,9 +1103,8 @@ namespace CheckForLocation
             }
 
             Console.WriteLine(caseReference + " : Sending forward email");
- 
 
-            if (sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton")&&defaultRouting)
+            if (caseDetails.sovereignCouncil.ToLower().Equals("northampton")&&defaultRouting)
             {
                 Console.WriteLine(caseReference + " : Local default case no forward necessary");
             }
