@@ -333,15 +333,18 @@ namespace Email2CXM.Helpers
                                 int address3Ends = emailContents.ToLower().IndexOf("postcode:");
                                 if (address3Starts > 16)
                                 {
-                                    address+= emailContents.Substring(address3Starts, address3Ends - address3Starts).TrimEnd('\r', '\n') + ", ";
+                                    address+= emailContents.Substring(address3Starts, address3Ends - address3Starts).TrimEnd('\r', '\n');
                                 }                                
                             }
                             catch { }
                             try
                             {
                                 int postcodeStarts = emailContents.ToLower().IndexOf("postcode: ") + 10;
-                                int postcodeEnds = emailContents.Length; 
-                                address += emailContents.Substring(postcodeStarts, postcodeEnds - postcodeStarts).TrimEnd('\r', '\n');
+                                int postcodeEnds = emailContents.Length;
+                                if(postcodeEnds - postcodeStarts<10)
+                                {
+                                    address += ", " + emailContents.Substring(postcodeStarts, postcodeEnds - postcodeStarts).TrimEnd('\r', '\n');
+                                }                             
                             }
                             catch { }
                             try
