@@ -529,7 +529,7 @@ namespace Email2CXM.Helpers
                                         { "surname", lastName },
                                         { "email", emailFrom },
                                         { "subject", subject },
-                                        { "enquiry-details", parsedEmailUnencoded },
+                                        { "enquiry-details", await TrimEmailContents(parsedEmailUnencoded)},
                                         { "customer-has-updated", false },
                                         { "unitary", unitary },
                                         { "contact-us", contactUs },
@@ -538,7 +538,7 @@ namespace Email2CXM.Helpers
                                         { "customer-address", address },
                                         { "email-id", keyName},
                                         { "sovereign-service-area", cxmSovereignServiceArea },
-                                        { "original-email", await TrimEmailContents(message.TextBody) }
+                                        { "original-email", await TrimEmailContents(parsedEmailUnencoded) }
                                     };
                                     success = await CreateCase(values, parsedEmailUnencoded, message, person, bundlerFound);
                                     if (!success)
@@ -554,7 +554,7 @@ namespace Email2CXM.Helpers
                                         { "surname", lastName },
                                         { "email", emailFrom },
                                         { "subject", subject },
-                                        { "enquiry-details", parsedEmailUnencoded },
+                                        { "enquiry-details", await TrimEmailContents(parsedEmailUnencoded) },
                                         { "customer-has-updated", false },
                                         { "unitary", unitary },
                                         { "contact-us", contactUs },
