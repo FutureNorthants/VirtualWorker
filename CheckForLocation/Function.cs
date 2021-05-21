@@ -266,11 +266,7 @@ namespace CheckForLocation
                         caseDetails.manualReview = (Boolean)caseSearch.SelectToken("values.manual_review");
                     }
                     catch (Exception) { }
-                    try
-                    {
-                        caseDetails.forward = (String)caseSearch.SelectToken("values.emn_fwd_to_sovereign_council");
-                    }
-                    catch (Exception) { }
+ 
                     if (caseReference.ToLower().Contains("ema"))
                     {
                         caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email");
@@ -304,18 +300,24 @@ namespace CheckForLocation
                     {
                         caseDetails.ConfirmationSent = (Boolean)caseSearch.SelectToken("values.confirmation_sent");
                     }
-                    catch (Exception) { }
-                    if (caseReference.ToLower().Contains("emn"))
-                    {
-                        caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
-                        caseDetails.nncForwardEMailTo = GetStringValueFromJSON(caseSearch, "values.forward_email_to");
-                        caseDetails.contactUs = (Boolean)caseSearch.SelectToken("values.emn_contact_us");
-                    }
+                    catch (Exception) { } 
                     caseDetails.enquiryDetails = (String)caseSearch.SelectToken("values.enquiry_details");
                     caseDetails.customerHasUpdated = (Boolean)caseSearch.SelectToken("values.customer_has_updated");
                     caseDetails.sovereignCouncil = GetStringValueFromJSON(caseSearch, "values.sovereign_council");
                     caseDetails.sovereignServiceArea = GetStringValueFromJSON(caseSearch, "values.sovereign_service_area");
                     caseDetails.fullEmail = GetStringValueFromJSON(caseSearch, "values.original_email");
+                    if (caseReference.ToLower().Contains("emn"))
+                    {
+                        caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
+                        caseDetails.nncForwardEMailTo = GetStringValueFromJSON(caseSearch, "values.forward_email_to");
+                        caseDetails.contactUs = (Boolean)caseSearch.SelectToken("values.emn_contact_us");
+                        try
+                        {
+                            caseDetails.forward = (String)caseSearch.SelectToken("values.emn_fwd_to_sovereign_council");
+                            caseDetails.sovereignCouncil = caseDetails.forward;
+                        }
+                        catch (Exception) { }
+                    }
                 }
                 else
                 {
@@ -419,6 +421,7 @@ namespace CheckForLocation
                                 defaultRouting = true;
                             }
                             UpdateCaseString("sovereign-council", sovereignLocation.SovereignCouncilName);
+                            caseDetails.sovereignCouncil = sovereignLocation.SovereignCouncilName;
                             if (preventOutOfArea && west && !sovereignLocation.sovereignWest)
                             {
                                 UpdateCaseString("email-comments", "Contact destination out of area");
@@ -1102,9 +1105,8 @@ namespace CheckForLocation
             }
 
             Console.WriteLine(caseReference + " : Sending forward email");
- 
 
-            if (sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton")&&defaultRouting)
+            if (caseDetails.sovereignCouncil.ToLower().Equals("northampton")&&defaultRouting)
             {
                 Console.WriteLine(caseReference + " : Local default case no forward necessary");
             }

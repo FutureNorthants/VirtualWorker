@@ -333,15 +333,18 @@ namespace Email2CXM.Helpers
                                 int address3Ends = emailContents.ToLower().IndexOf("postcode:");
                                 if (address3Starts > 16)
                                 {
-                                    address+= emailContents.Substring(address3Starts, address3Ends - address3Starts).TrimEnd('\r', '\n') + ", ";
+                                    address+= emailContents.Substring(address3Starts, address3Ends - address3Starts).TrimEnd('\r', '\n');
                                 }                                
                             }
                             catch { }
                             try
                             {
                                 int postcodeStarts = emailContents.ToLower().IndexOf("postcode: ") + 10;
-                                int postcodeEnds = emailContents.Length; 
-                                address += emailContents.Substring(postcodeStarts, postcodeEnds - postcodeStarts).TrimEnd('\r', '\n');
+                                int postcodeEnds = emailContents.Length;
+                                if(postcodeEnds - postcodeStarts<10)
+                                {
+                                    address += ", " + emailContents.Substring(postcodeStarts, postcodeEnds - postcodeStarts).TrimEnd('\r', '\n');
+                                }                             
                             }
                             catch { }
                             try
@@ -415,6 +418,7 @@ namespace Email2CXM.Helpers
                         }
                     }
 
+
                     if (emailFrom.Contains(secrets.loopPreventIdentifier) || (emailTo.ToLower().Contains("update") &&(emailFrom.ToLower().Contains("westnorthants.gov.uk") || emailFrom.ToLower().Contains("northnorthants.gov.uk"))))
                     {
                         Console.WriteLine(emailFrom + " - Loop identifier found - no case created or updated : " + keyName);
@@ -454,48 +458,55 @@ namespace Email2CXM.Helpers
 
                             caseReference = caseNumber;
 
-                            String fieldName = "enquiry-details";
-
-                            String data = "{\"" + fieldName + "\":" + parsedEmailEncoded + "," +
-                                          "\"" + "customer-has-updated" + "\":" + "true" +
-                                          "}";
-
-                            Console.WriteLine($"PATCH payload : " + data);
-
-                            String url = cxmEndPoint + "/api/service-api/" + cxmAPIName + "/case/" + caseNumber + "/edit?key=" + cxmAPIKey;
-                            Encoding encoding = Encoding.Default;
-                            HttpWebRequest patchRequest = (HttpWebRequest)WebRequest.Create(url);
-                            patchRequest.Method = "PATCH";
-                            patchRequest.ContentType = "application/json; charset=utf-8";
-                            byte[] buffer = encoding.GetBytes(data);
-                            Stream dataStream = patchRequest.GetRequestStream();
-                            dataStream.Write(buffer, 0, buffer.Length);
-                            dataStream.Close();
-                            try
+                            if (await IsAutoResponse(parsedEmailUnencoded))
                             {
-                                HttpWebResponse patchResponse = (HttpWebResponse)patchRequest.GetResponse();
-                                String result = "";
-                                using (StreamReader reader = new StreamReader(patchResponse.GetResponseStream(), Encoding.Default))
-                                {
-                                    result = reader.ReadToEnd();
-                                }
-                            }
-                            catch (Exception error)
-                            {
-                                Console.WriteLine(caseNumber + " : " + error.ToString());
-                                Console.WriteLine(caseNumber + " : Error updating CXM field " + fieldName + " with message : " + message);
-                            }
-
-                            String unitary = await GetStringFieldFromDynamoAsync(caseReference, "Unitary", tableName);
-
-                            if (unitary.Equals("true"))
-                            {
-                                await TransitionCaseAsync("awaiting-location-confirmation");
+                                Console.WriteLine(caseReference + " : " + emailFrom + " - Autoresponder Text Found : " + keyName);
                             }
                             else
                             {
-                                await TransitionCaseAsync("awaiting-review");
-                            }
+                                String fieldName = "enquiry-details";
+
+                                String data = "{\"" + fieldName + "\":" + parsedEmailEncoded + "," +
+                                              "\"" + "customer-has-updated" + "\":" + "true" +
+                                              "}";
+
+                                Console.WriteLine($"PATCH payload : " + data);
+
+                                String url = cxmEndPoint + "/api/service-api/" + cxmAPIName + "/case/" + caseNumber + "/edit?key=" + cxmAPIKey;
+                                Encoding encoding = Encoding.Default;
+                                HttpWebRequest patchRequest = (HttpWebRequest)WebRequest.Create(url);
+                                patchRequest.Method = "PATCH";
+                                patchRequest.ContentType = "application/json; charset=utf-8";
+                                byte[] buffer = encoding.GetBytes(data);
+                                Stream dataStream = patchRequest.GetRequestStream();
+                                dataStream.Write(buffer, 0, buffer.Length);
+                                dataStream.Close();
+                                try
+                                {
+                                    HttpWebResponse patchResponse = (HttpWebResponse)patchRequest.GetResponse();
+                                    String result = "";
+                                    using (StreamReader reader = new StreamReader(patchResponse.GetResponseStream(), Encoding.Default))
+                                    {
+                                        result = reader.ReadToEnd();
+                                    }
+                                }
+                                catch (Exception error)
+                                {
+                                    Console.WriteLine(caseNumber + " : " + error.ToString());
+                                    Console.WriteLine(caseNumber + " : Error updating CXM field " + fieldName + " with message : " + message);
+                                }
+
+                                String unitary = await GetStringFieldFromDynamoAsync(caseReference, "Unitary", tableName);
+
+                                if (unitary.Equals("true"))
+                                {
+                                    await TransitionCaseAsync("awaiting-location-confirmation");
+                                }
+                                else
+                                {
+                                    await TransitionCaseAsync("awaiting-review");
+                                }
+                            }  
                         }
                         else
                         {
@@ -526,7 +537,7 @@ namespace Email2CXM.Helpers
                                         { "surname", lastName },
                                         { "email", emailFrom },
                                         { "subject", subject },
-                                        { "enquiry-details", parsedEmailUnencoded },
+                                        { "enquiry-details", await TrimEmailContents(parsedEmailUnencoded)},
                                         { "customer-has-updated", false },
                                         { "unitary", unitary },
                                         { "contact-us", contactUs },
@@ -535,7 +546,7 @@ namespace Email2CXM.Helpers
                                         { "customer-address", address },
                                         { "email-id", keyName},
                                         { "sovereign-service-area", cxmSovereignServiceArea },
-                                        { "original-email", await TrimEmailContents(message.TextBody) }
+                                        { "original-email", await TrimEmailContents(parsedEmailUnencoded) }
                                     };
                                     success = await CreateCase(values, parsedEmailUnencoded, message, person, bundlerFound);
                                     if (!success)
@@ -551,7 +562,7 @@ namespace Email2CXM.Helpers
                                         { "surname", lastName },
                                         { "email", emailFrom },
                                         { "subject", subject },
-                                        { "enquiry-details", parsedEmailUnencoded },
+                                        { "enquiry-details", await TrimEmailContents(parsedEmailUnencoded) },
                                         { "customer-has-updated", false },
                                         { "unitary", unitary },
                                         { "contact-us", contactUs },
@@ -848,6 +859,49 @@ namespace Email2CXM.Helpers
         {
             return emailContents;
         }
+
+        private async Task<Boolean> IsAutoResponse(String emailContents)
+        {
+            List<String> autoResponseText = new List<String>();
+            Dictionary<string, AttributeValue> lastKeyEvaluated = null;
+            try
+            {
+                AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);
+                do
+                {
+                    ScanRequest request = new ScanRequest
+                    {
+                        TableName = secrets.AutoResponseTable,
+                        Limit = 10,
+                        ExclusiveStartKey = lastKeyEvaluated,
+                        ProjectionExpression = "AutoResponseText"
+                    };
+
+                    ScanResponse response = await dynamoDBClient.ScanAsync(request);
+                    foreach (Dictionary<string, AttributeValue> item
+                         in response.Items)
+                    {
+                        item.TryGetValue("AutoResponseText", out AttributeValue value);
+                        autoResponseText.Add(value.S.ToLower());
+                    }
+                    lastKeyEvaluated = response.LastEvaluatedKey;
+                } while (lastKeyEvaluated != null && lastKeyEvaluated.Count != 0);
+                foreach (String text in autoResponseText)
+                {
+                    if (emailContents.ToLower().Contains(text))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine("ERROR : ISAutoResponse :" + error.Message);
+                Console.WriteLine(error.StackTrace);
+                return false;
+            }
+        }
     }
 
     public class Secrets
@@ -881,5 +935,6 @@ namespace Email2CXM.Helpers
         public String nncEMNCasesTest { get; set; }
         public String WNCContactUsMappingTable { get; set; }
         public String NNCContactUsMappingTable { get; set; }
+        public String AutoResponseTable { get; set; }
     }
 }
