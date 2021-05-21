@@ -521,8 +521,10 @@ namespace CheckForLocation
         private async Task<Boolean> TransitionCaseAsync(String transitionTo)
         {
             Boolean success = false;
-            HttpClient cxmClient = new HttpClient();
-            cxmClient.BaseAddress = new Uri(cxmEndPoint);
+            HttpClient cxmClient = new HttpClient
+            {
+                BaseAddress = new Uri(cxmEndPoint)
+            };
             string requestParameters = "key=" + cxmAPIKey;
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "/transition/" + transitionTo + "?" + requestParameters);
             HttpResponseMessage response = cxmClient.SendAsync(request).Result;
