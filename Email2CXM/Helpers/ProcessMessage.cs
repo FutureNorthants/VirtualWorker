@@ -45,6 +45,7 @@ namespace Email2CXM.Helpers
         private String emailTo { get; set; } = null;
         private String subject { get; set; } = null;
         private String serviceArea { get; set; } = null;
+        private String AutoResponseTable = null;
         public String firstName { get; set; } = null;
         public String lastName { get; set; } = null;
         public String emailBody { get; set; } = null;
@@ -171,6 +172,7 @@ namespace Email2CXM.Helpers
                                 cxmAPICaseType = secrets.cxmAPICaseTypeWestLive;
                                 tableName = secrets.wncEMACasesLive;
                                 ContactUsTableMapping = secrets.WNCContactUsMappingTable;
+                                AutoResponseTable = secrets.AutoResponseTableLive;
                             }
                             else
                             {
@@ -180,6 +182,7 @@ namespace Email2CXM.Helpers
                                 cxmAPICaseType = secrets.cxmAPICaseTypeNorthLive;
                                 tableName = secrets.nncEMNCasesLive;
                                 ContactUsTableMapping = secrets.NNCContactUsMappingTable;
+                                AutoResponseTable = secrets.AutoResponseTableLive;
                             }
 
                         }
@@ -193,6 +196,7 @@ namespace Email2CXM.Helpers
                                 cxmAPICaseType = secrets.cxmAPICaseTypeWest;
                                 tableName = secrets.wncEMACasesTest;
                                 ContactUsTableMapping = secrets.WNCContactUsMappingTable;
+                                AutoResponseTable = secrets.AutoResponseTableTest;
                             }
                             else
                             {
@@ -202,6 +206,7 @@ namespace Email2CXM.Helpers
                                 cxmAPICaseType = secrets.cxmAPICaseTypeNorth;
                                 tableName = secrets.nncEMNCasesTest;
                                 ContactUsTableMapping = secrets.NNCContactUsMappingTable;
+                                AutoResponseTable = secrets.AutoResponseTableTest;
                             }
                         }
 
@@ -871,7 +876,7 @@ namespace Email2CXM.Helpers
                 {
                     ScanRequest request = new ScanRequest
                     {
-                        TableName = secrets.AutoResponseTable,
+                        TableName = AutoResponseTable,
                         Limit = 10,
                         ExclusiveStartKey = lastKeyEvaluated,
                         ProjectionExpression = "AutoResponseText"
@@ -935,6 +940,7 @@ namespace Email2CXM.Helpers
         public String nncEMNCasesTest { get; set; }
         public String WNCContactUsMappingTable { get; set; }
         public String NNCContactUsMappingTable { get; set; }
-        public String AutoResponseTable { get; set; }
+        public String AutoResponseTableLive { get; set; }
+        public String AutoResponseTableTest { get; set; }
     }
 }

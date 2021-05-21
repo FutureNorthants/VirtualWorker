@@ -318,6 +318,10 @@ namespace CheckForLocation
                         }
                         catch (Exception) { }
                     }
+                    if (String.IsNullOrEmpty(caseDetails.sovereignCouncil))
+                    {
+                        caseDetails.sovereignCouncil = "";
+                    }
                 }
                 else
                 {
@@ -353,7 +357,7 @@ namespace CheckForLocation
                         }
                         success = await SendEmails(caseDetails, forwardingEmailAddress, true);
                         caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
-                        if (caseDetails.sovereignCouncil.ToLower().Equals("northampton")&&!defaultRouting)
+                        if (caseDetails.sovereignCouncil.ToLower().Equals("northampton")&&defaultRouting)
                         {
                             await TransitionCaseAsync("awaiting-review");
                         }
@@ -517,8 +521,10 @@ namespace CheckForLocation
         private async Task<Boolean> TransitionCaseAsync(String transitionTo)
         {
             Boolean success = false;
-            HttpClient cxmClient = new HttpClient();
-            cxmClient.BaseAddress = new Uri(cxmEndPoint);
+            HttpClient cxmClient = new HttpClient
+            {
+                BaseAddress = new Uri(cxmEndPoint)
+            };
             string requestParameters = "key=" + cxmAPIKey;
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "/transition/" + transitionTo + "?" + requestParameters);
             HttpResponseMessage response = cxmClient.SendAsync(request).Result;
@@ -700,54 +706,60 @@ namespace CheckForLocation
                 return sovereignLocation;
             }
 
-            if (emailBody.ToLower().Contains("northampton"))
+            if (emailBody.ToLower().Contains("northampton")||await IsInArea(emailBody.ToLower(),"LocationsNorthampton"))
             {
-                //if((emailBody.ToLower().inde)
                 sovereignLocation.SovereignCouncilName = "Northampton";
                 sovereignLocation.sovereignWest = true;
                 sovereignLocation.Success = true;
+                return sovereignLocation;
             }
-            else
-            if (emailBody.ToLower().Contains("towcester") || emailBody.ToLower().Contains("cogenhoe"))
+ 
+            if (emailBody.ToLower().Contains("towcester") || await IsInArea(emailBody.ToLower(), "LocationsSouthNorthants"))
             {
                 sovereignLocation.SovereignCouncilName = "south_northants";
                 sovereignLocation.sovereignWest = true;
                 sovereignLocation.Success = true;
+                return sovereignLocation;
             }
-            else
-            if (emailBody.ToLower().Contains("daventry"))
+
+            if (emailBody.ToLower().Contains("daventry") || await IsInArea(emailBody.ToLower(), "LocationsDaventry"))
             {
                 sovereignLocation.SovereignCouncilName = "Daventry";
                 sovereignLocation.sovereignWest = true;
                 sovereignLocation.Success = true;
+                return sovereignLocation;
             }
-            else
-            if (emailBody.ToLower().Contains("wellingborough"))
+ 
+            if (emailBody.ToLower().Contains("wellingborough") || await IsInArea(emailBody.ToLower(), "LocationsWellingborough"))
             {
                 sovereignLocation.SovereignCouncilName = "Wellingborough";
                 sovereignLocation.sovereignWest = false;
                 sovereignLocation.Success = true;
+                return sovereignLocation;
             }
-            else
-            if (emailBody.ToLower().Contains("kettering"))
+
+            if (emailBody.ToLower().Contains("kettering") || await IsInArea(emailBody.ToLower(), "LocationsKettering"))
             {
                 sovereignLocation.SovereignCouncilName = "Kettering";
                 sovereignLocation.sovereignWest = false;
                 sovereignLocation.Success = true;
+                return sovereignLocation;
             }
-            else
-            if (emailBody.ToLower().Contains("corby"))
+
+            if (emailBody.ToLower().Contains("corby") || await IsInArea(emailBody.ToLower(), "LocationsCorby"))
             {
                 sovereignLocation.SovereignCouncilName = "Corby";
                 sovereignLocation.sovereignWest = false;
                 sovereignLocation.Success = true;
+                return sovereignLocation;
             }
-            else
-            if (emailBody.ToLower().Contains("rushden"))
+ 
+            if (emailBody.ToLower().Contains("rushden") || await IsInArea(emailBody.ToLower(), "LocationsEastNorthants"))
             {
                 sovereignLocation.SovereignCouncilName = "east_northants";
                 sovereignLocation.sovereignWest = false;
                 sovereignLocation.Success = true;
+                return sovereignLocation;
             }
             return sovereignLocation;
         }
@@ -1242,6 +1254,49 @@ namespace CheckForLocation
             await Task.CompletedTask;
         }
 
+        private async Task<Boolean> IsInArea(String emailContents, String tableName)
+        {
+            List<String> locations = new List<String>();
+            Dictionary<string, AttributeValue> lastKeyEvaluated = null;
+            try
+            {
+                AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);
+                do
+                {
+                    ScanRequest request = new ScanRequest
+                    {
+                        TableName = tableName,
+                        Limit = 10,
+                        ExclusiveStartKey = lastKeyEvaluated,
+                        ProjectionExpression = "LocationText"
+                    };
+
+                    ScanResponse response = await dynamoDBClient.ScanAsync(request);
+                    foreach (Dictionary<string, AttributeValue> item
+                         in response.Items)
+                    {
+                        item.TryGetValue("LocationText", out AttributeValue value);
+                        locations.Add(value.S.ToLower());
+                    }
+                    lastKeyEvaluated = response.LastEvaluatedKey;
+                } while (lastKeyEvaluated != null && lastKeyEvaluated.Count != 0);
+                foreach (String location in locations)
+                {
+                    if (emailContents.ToLower().Contains(location))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine("ERROR : ISAutoResponse :" + error.Message);
+                Console.WriteLine(error.StackTrace);
+                return false;
+            }
+        }
+
         public async Task<Boolean> SendEmailAsync(String from, String fromAddress, String toAddress, String bccAddress, String subject, String emailID, String htmlBody, String textBody)
         {
             using (var client = new AmazonSimpleEmailServiceClient(RegionEndpoint.EUWest1))
@@ -1387,7 +1442,7 @@ namespace CheckForLocation
         public String WncBccAddressLive { get; set; }
         public String NncBccAddressTest { get; set; }
         public String NncBccAddressLive { get; set; }
-    }
+}
 
     public class Location
     {
