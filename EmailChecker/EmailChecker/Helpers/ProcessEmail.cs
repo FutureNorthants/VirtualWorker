@@ -13,8 +13,10 @@ namespace EmailChecker.Helpers
 {
     class ProcessEmail
     {
-        private static readonly RegionEndpoint bucketRegion = RegionEndpoint.EUWest1;
-        private static IAmazonS3 client;
+        private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
+        private static IAmazonS3 s3EmailsClient;
+        private static IAmazonS3 s3TemplatesClient;
+        private static IAmazonS3 s3Client;
         public static Boolean emailPassedChecks { get; set; } = false;
         public static Boolean spamCheckPass { get; set; } = false;
         public static Boolean virusCheckPass { get; set; } = false;
@@ -27,15 +29,20 @@ namespace EmailChecker.Helpers
 
         public ProcessEmail()
         {
-            client = new AmazonS3Client(bucketRegion);
         }
 
-        public Boolean Process(String bucketName, String keyName, float confidence)
+        public Boolean Process(String bucketName, String keyName, float confidence, String pendingimagesbucket, String quarantinedimagesbucket, String templatesBucket, RegionEndpoint s3EmailsRegion, RegionEndpoint s3TemplatesRegion)
         {
-            return ReadObjectDataAsync(bucketName, keyName, confidence).Result;
+            Console.WriteLine("Pending Images Bucket : " + pendingimagesbucket);
+            Console.WriteLine("Quarantined Images Bucket : " + quarantinedimagesbucket);
+            Console.WriteLine("Templates Bucket : " + templatesBucket);
+            s3EmailsClient = new AmazonS3Client(s3EmailsRegion);
+            s3TemplatesClient = new AmazonS3Client(s3TemplatesRegion);
+            s3Client = new AmazonS3Client(primaryRegion);
+            return ReadObjectDataAsync(bucketName, keyName, confidence, pendingimagesbucket, quarantinedimagesbucket, templatesBucket).Result;
         }
 
-        private async Task<Boolean> ReadObjectDataAsync(String bucketName, String keyName, float confidence)
+        private async Task<Boolean> ReadObjectDataAsync(String bucketName, String keyName, float confidence, String pendingimagesbucket, String quarantinedimagesbucket, String templatesBucket)
         {
             try
             {
@@ -44,7 +51,7 @@ namespace EmailChecker.Helpers
                     BucketName = bucketName,
                     Key = keyName
                 };
-                using (GetObjectResponse response = await client.GetObjectAsync(request))
+                using (GetObjectResponse response = await s3EmailsClient.GetObjectAsync(request))
                 {
                     MimeMessage message = MimeMessage.Load(response.ResponseStream);
                     MailAddressCollection mailAddresses = (MailAddressCollection)message.From;
@@ -86,11 +93,11 @@ namespace EmailChecker.Helpers
                                         PutObjectRequest putRequest = new PutObjectRequest()
                                         {
                                             InputStream = imageStream,
-                                            BucketName = "nbc-pending-images",
+                                            BucketName = pendingimagesbucket,
                                             Key = fileName,
                                         };
                                         putRequest.Headers.ContentLength = attachmentLength;
-                                        await client.PutObjectAsync(putRequest);
+                                        await s3Client.PutObjectAsync(putRequest);
                                         Console.WriteLine("Written to S3 : {0}", fileName);
                                     }
 
@@ -110,7 +117,7 @@ namespace EmailChecker.Helpers
                                         S3Object = new Amazon.Rekognition.Model.S3Object()
                                         {
                                             Name = fileName,
-                                            Bucket = "nbc-pending-images"
+                                            Bucket = pendingimagesbucket
                                         },
                                     },
                                     MinConfidence = 60F
@@ -131,58 +138,59 @@ namespace EmailChecker.Helpers
                                                 Console.WriteLine("Rejected - Label: {0}\n Confidence: {1}", label.Name, label.Confidence);
                                                 imageCheckPass = false;
                                             }
-                                           
-                                            try
-                                            {
-                                                if (imageCheckPass)
-                                                {
-                                                    DeleteObjectRequest deleteRequest = new DeleteObjectRequest
-                                                    {
-                                                        BucketName = "nbc-pending-images",
-                                                        Key = fileName
-                                                    };
-                                                    await client.DeleteObjectAsync(deleteRequest);
-                                                }
-                                                else
-                                                {
-                                                    try
-                                                    {
-                                                        DeleteObjectRequest clearRequest = new DeleteObjectRequest
-                                                        {
-                                                            BucketName = "nbc-quarantined-image",
-                                                            Key = fileName
-                                                        };
-                                                        await client.DeleteObjectAsync(clearRequest);
-                                                    }
-                                                    catch(Exception error)
-                                                    {
-                                                    }
-                                                    CopyObjectRequest copyRequest = new CopyObjectRequest
-                                                    {
-                                                        SourceBucket = "nbc-pending-images",
-                                                        SourceKey = fileName,
-                                                        DestinationBucket = "nbc-quarantined-image",
-                                                        DestinationKey = fileName
-                                                    };
-                                                    await client.CopyObjectAsync(copyRequest);
-
-                                                    DeleteObjectRequest deleteRequest = new DeleteObjectRequest
-                                                    {
-                                                        BucketName = "nbc-pending-images",
-                                                        Key = fileName
-                                                    };
-                                                    await client.DeleteObjectAsync(deleteRequest);
-                                                }
-                                            }
-                                            catch (Exception error)
-                                            {
-                                                Console.WriteLine("ERROR : Moving/Deleting Image : " + error.Message);
-                                                Console.WriteLine(error.StackTrace);
-                                            }
-
                                         }
                                     }
-
+                                           
+                                    try
+                                    {
+                                        if (imageCheckPass)
+                                        {
+                                            DeleteObjectRequest deleteRequest = new DeleteObjectRequest
+                                            {
+                                                BucketName = pendingimagesbucket,
+                                                Key = fileName
+                                            };
+                                            await s3Client.DeleteObjectAsync(deleteRequest);
+                                        }
+                                        else
+                                        {
+                                            Console.WriteLine("Image Rejection Started");
+                                            try
+                                            {
+                                                Console.WriteLine("Clearing : Deleting " + fileName + " from : " + quarantinedimagesbucket);
+                                                DeleteObjectRequest clearRequest = new DeleteObjectRequest
+                                                {
+                                                    BucketName = quarantinedimagesbucket,
+                                                    Key = fileName
+                                                };
+                                                await s3Client.DeleteObjectAsync(clearRequest);
+                                            }
+                                            catch(Exception){}
+                                            Console.WriteLine("Quarantining : Copying " + fileName + " to : " + quarantinedimagesbucket);
+                                            CopyObjectRequest copyRequest = new CopyObjectRequest
+                                            {
+                                                SourceBucket = pendingimagesbucket,
+                                                SourceKey = fileName,
+                                                DestinationBucket = quarantinedimagesbucket,
+                                                DestinationKey = fileName
+                                            };
+                                            await s3Client.CopyObjectAsync(copyRequest);
+                                            Console.WriteLine("Deleting : Deleting " + fileName + " from : " + pendingimagesbucket);
+                                            DeleteObjectRequest deleteRequest = new DeleteObjectRequest
+                                            {
+                                                BucketName = pendingimagesbucket,
+                                                Key = fileName
+                                            };
+                                            await s3Client.DeleteObjectAsync(deleteRequest);
+                                            Console.WriteLine("Deleting : Deleting " + fileName + " from : " + pendingimagesbucket);
+                                            Console.WriteLine("Image Rejection Ended");
+                                        }
+                                    }
+                                    catch (Exception error)
+                                    {
+                                        Console.WriteLine("ERROR : Moving/Deleting Image : " + error.Message);
+                                        Console.WriteLine(error.StackTrace);
+                                    }
                                 }
                                 catch (Exception e)
                                 {
@@ -221,10 +229,10 @@ namespace EmailChecker.Helpers
                         {
                             GetObjectRequest objectRequest = new GetObjectRequest
                             {
-                                BucketName = "norbert.templates",
+                                BucketName = templatesBucket,
                                 Key = "email-unsafe-rejection.txt"
                             };
-                            using (GetObjectResponse objectResponse = await client.GetObjectAsync(objectRequest))
+                            using (GetObjectResponse objectResponse = await s3TemplatesClient.GetObjectAsync(objectRequest))
                             using (Stream responseStream = objectResponse.ResponseStream)
                             using (StreamReader reader = new StreamReader(responseStream))
                             {
