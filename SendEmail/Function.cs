@@ -45,8 +45,6 @@ namespace SendEmail
                 {
                 }
 
-                context.Logger.LogLine("NorbertSendFrom : " + norbertSendFrom);
-
                 foreach (var message in evnt.Records)
                 {
                     await ProcessMessageAsync(message, context);
@@ -59,6 +57,7 @@ namespace SendEmail
             message.MessageAttributes.TryGetValue("To", out MessageAttribute toEmail);
             message.MessageAttributes.TryGetValue("Subject", out MessageAttribute subject);
             norbertSendFrom = secrets.norbertSendFromTest;
+            context.Logger.LogLine("Default NorbertSendFrom : " + norbertSendFrom);
             context.Logger.LogLine("Finding SendFrom");
             if (subject.StringValue.ToLower().Contains("ema"))
             {
@@ -106,7 +105,7 @@ namespace SendEmail
                     Destination = new Destination
                     {
                         ToAddresses = new List<string> { toEmail.StringValue },
-                        BccAddresses = new List<string> { "kwhite@northampton.gov.uk", "kevin.white@futurenorthants.org" }
+                        BccAddresses = new List<string> { "kevin.white@westnorthants.gov.uk"}
                     },
                     Message = new Message
                     {
