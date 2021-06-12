@@ -60,12 +60,14 @@ namespace UploadFile2CXM
                                 sqsURL = secrets.sqsPostAttachmentUploadLive;
                                 break;
                             case "nnc-email-attachments.test":
+                            case "nnc.incoming.attachments.test":
                                 cxmDomain = secrets.cxmEndPointTestNorth;
                                 cxmServiceAPI = secrets.cxmAPINameNorth;
                                 cxmServiceAPIKey = secrets.cxmAPIKeyTestNorth;
                                 sqsURL = secrets.sqsPostAttachmentUploadTest;
                                 break;
                             case "nnc-email-attachments.live":
+                            case "nnc.incoming.attachments.live":
                                 cxmDomain = secrets.cxmEndPointLiveNorth;
                                 cxmServiceAPI = secrets.cxmAPINameNorth;
                                 cxmServiceAPIKey = secrets.cxmAPIKeyLiveNorth;
