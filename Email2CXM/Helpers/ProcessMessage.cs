@@ -73,6 +73,10 @@ namespace Email2CXM.Helpers
             unitary = false;
             contactUs = false;
             district = true;
+            if (bucketName.ToLower().Contains("incoming"))
+            {
+                client = new AmazonS3Client(primaryRegion);
+            }
             return ReadObjectDataAsync(bucketName, keyName, liveInstance).Result;
         }
 

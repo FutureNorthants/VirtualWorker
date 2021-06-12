@@ -6,8 +6,8 @@
         "dotnet lambda help",
         "All the command line options for the Lambda command can be specified in this file."
     ],
-    "profile"     : "default",
-    "region"      : "eu-west-1",
+    "profile"     : "NNC Prod",
+    "region"      : "eu-west-2",
     "configuration" : "Release",
     "framework"     : "netcoreapp3.1",
     "function-runtime" : "dotnetcore3.1",
@@ -17,8 +17,9 @@
     "function-name"        : "Email2CXM",
     "function-description" : "Processes incoming emails, to refine content prior to creating in CXM",
     "package-type"         : "Zip",
-    "function-role"        : "arn:aws:iam::898823515462:role/lambdaMyCouncil",
+    "function-role"        : "arn:aws:iam::418943896884:role/nncLambda",
     "tracing-mode"         : "PassThrough",
     "environment-variables" : "",
-    "image-tag"             : ""
+    "image-tag"             : "",
+    "dead-letter-target-arn" : "arn:aws:sqs:eu-west-2:418943896884:dlq_mailbot"
 }
