@@ -15,7 +15,7 @@
     "function-timeout"     : 30,
     "function-handler"     : "SendEmail::SendEmail.Function::FunctionHandler",
     "function-name"        : "SendEmail",
-    "function-description" : "",
+    "function-description" : "Sends preformatted email received from SQS",
     "package-type"         : "Zip",
     "dead-letter-target-arn" : "arn:aws:sqs:eu-west-2:418943896884:dlq_mailbot",
     "tracing-mode"           : "Active",
