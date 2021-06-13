@@ -13,7 +13,7 @@
     "function-runtime" : "dotnetcore3.1",
     "function-memory-size" : 256,
     "function-timeout"     : 30,
-    "function-handler"     : "Email2CXM::Email2CXM.Function::FunctionHandler",
+    "function-handler"     : "GetService::GetService.Function::FunctionHandler",
     "function-name"        : "GetService",
     "function-description" : "Gets local service area",
     "package-type"         : "Zip",
