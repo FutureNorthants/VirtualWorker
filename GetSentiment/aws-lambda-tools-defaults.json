@@ -13,7 +13,7 @@
     "function-runtime" : "dotnetcore3.1",
     "function-memory-size" : 256,
     "function-timeout"     : 30,
-    "function-handler"     : "Email2CXM::Email2CXM.Function::FunctionHandler",
+    "function-handler"     : "GetSentiment::GetSentiment.Function::FunctionHandler",
     "function-name"        : "GetSentiment",
     "function-description" : "Retrieve sentiment of customer contact",
     "package-type"         : "Zip",
