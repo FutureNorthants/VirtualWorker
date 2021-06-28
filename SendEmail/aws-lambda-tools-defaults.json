@@ -6,8 +6,8 @@
         "dotnet lambda help",
         "All the command line options for the Lambda command can be specified in this file."
     ],
-    "profile"     : "NNC Prod",
-    "region"      : "eu-west-2",
+    "profile"     : "default",
+    "region"      : "eu-west-1",
     "configuration" : "Release",
     "framework"     : "netcoreapp3.1",
     "function-runtime" : "dotnetcore3.1",
@@ -17,9 +17,9 @@
     "function-name"        : "SendEmail",
     "function-description" : "Sends preformatted email received from SQS",
     "package-type"         : "Zip",
-    "dead-letter-target-arn" : "arn:aws:sqs:eu-west-2:418943896884:dlq_mailbot",
+    "dead-letter-target-arn" : "arn:aws:sqs:eu-west-1:898823515462:SendEmailDLQ",
     "tracing-mode"           : "Active",
     "environment-variables"  : "",
     "image-tag"              : "",
-    "function-role"          : "arn:aws:iam::418943896884:role/nncLambda"
+    "function-role"          : "arn:aws:iam::898823515462:role/lambdaMyCouncil"
 }

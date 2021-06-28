@@ -213,14 +213,14 @@ namespace GetService
                 else
                 {
                     await SendFailureAsync("Getting case details for " + caseReference, response.StatusCode.ToString());
-                    Console.WriteLine("ERROR : GetStaffResponseAsync : " + request.ToString());
-                    Console.WriteLine("ERROR : GetStaffResponseAsync : " + response.StatusCode.ToString());
+                    Console.WriteLine("ERROR : GetCustomerContactAsyncc : " + request.ToString());
+                    Console.WriteLine("ERROR : GetCustomerContactAsync : " + response.StatusCode.ToString());
                 }
             }
             catch (Exception error)
             {
                 await SendFailureAsync("Getting case details for " + caseReference, error.Message);
-                Console.WriteLine("ERROR : GetStaffResponseAsync : " + error.StackTrace);
+                Console.WriteLine("ERROR : GetCustomerContactAsync : " + error.StackTrace);
             }
             return caseDetails;
         }

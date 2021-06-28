@@ -1133,7 +1133,7 @@ namespace CheckForLocation
 
             Console.WriteLine(caseReference + " : Sending forward email");
 
-            if (caseDetails.sovereignCouncil.ToLower().Equals("northampton")&&defaultRouting)
+            if (west&&caseDetails.sovereignCouncil.ToLower().Equals("northampton")&&defaultRouting)
             {
                 Console.WriteLine(caseReference + " : Local default case no forward necessary");
             }
