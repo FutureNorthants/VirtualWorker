@@ -25,7 +25,6 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 
@@ -37,8 +36,8 @@ namespace CheckForLocation
     {
         private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
         private static readonly RegionEndpoint bucketRegion = RegionEndpoint.EUWest2;
-        private static readonly RegionEndpoint sqsRegion = RegionEndpoint.EUWest1;
-        private static readonly RegionEndpoint emailsRegion = RegionEndpoint.EUWest1;
+        private static RegionEndpoint sqsRegion = RegionEndpoint.EUWest1;
+        private static RegionEndpoint emailsRegion = RegionEndpoint.EUWest1;
         private static readonly String secretName = "nbcGlobal";
         private static readonly String secretAlias = "AWSCURRENT";
 
@@ -134,6 +133,8 @@ namespace CheckForLocation
                     if (caseReference.ToLower().Contains("emn"))
                     {
                         west = false;
+                        sqsRegion = RegionEndpoint.EUWest2;
+                        emailsRegion = RegionEndpoint.EUWest2;
                         caseTable = secrets.nncEMNCasesLive;
                         sovereignEmailTable = "MailBotCouncilsLive";
                         cxmEndPoint = secrets.cxmEndPointLiveNorth;
@@ -163,6 +164,7 @@ namespace CheckForLocation
                     sqsEmailURL = secrets.sqsEmailURLTest;
                     postCodeURL = secrets.postcodeURLTest;
                     lexAlias = "UAT";
+                    //TODO Looks wong - live????
                     myAccountEndPoint = secrets.myAccountEndPointLive;
                     if (caseReference.ToLower().Contains("ema"))
                     {
@@ -188,6 +190,8 @@ namespace CheckForLocation
                     if (caseReference.ToLower().Contains("emn"))
                     {
                         west = false;
+                        sqsRegion = RegionEndpoint.EUWest2;
+                        emailsRegion = RegionEndpoint.EUWest2;
                         caseTable = secrets.nncEMNCasesTest;
                         sovereignEmailTable = "MailBotCouncilsTest";
                         cxmEndPoint = secrets.cxmEndPointTestNorth;
@@ -454,6 +458,7 @@ namespace CheckForLocation
                                 success = await SendEmails(caseDetails, forwardingEmailAddress, true);                               
                                 if (west && sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton")&&defaultRouting)
                                 {
+                                    UpdateCaseBoolean("unitary", false);
                                     UpdateCaseString("email-comments", "Transitioning case to local process");
                                     await TransitionCaseAsync("awaiting-review");
                                 }
@@ -623,25 +628,35 @@ namespace CheckForLocation
                 AmazonSQSClient amazonSQSClient = new AmazonSQSClient(sqsRegion);
                 try
                 {
-                    SendMessageRequest sendMessageRequest = new SendMessageRequest();
-                    sendMessageRequest.QueueUrl = sqsEmailURL;
-                    sendMessageRequest.MessageBody = emailBody;
+                    SendMessageRequest sendMessageRequest = new SendMessageRequest
+                    {
+                        QueueUrl = sqsEmailURL,
+                        MessageBody = emailBody
+                    };
                     Dictionary<string, MessageAttributeValue> MessageAttributes = new Dictionary<string, MessageAttributeValue>();
-                    MessageAttributeValue messageTypeAttribute1 = new MessageAttributeValue();
-                    messageTypeAttribute1.DataType = "String";
-                    messageTypeAttribute1.StringValue = caseDetails.customerName;
+                    MessageAttributeValue messageTypeAttribute1 = new MessageAttributeValue
+                    {
+                        DataType = "String",
+                        StringValue = caseDetails.customerName
+                    };
                     MessageAttributes.Add("Name", messageTypeAttribute1);
-                    MessageAttributeValue messageTypeAttribute2 = new MessageAttributeValue();
-                    messageTypeAttribute2.DataType = "String";
-                    messageTypeAttribute2.StringValue = emailTo;
+                    MessageAttributeValue messageTypeAttribute2 = new MessageAttributeValue
+                    {
+                        DataType = "String",
+                        StringValue = emailTo
+                    };
                     MessageAttributes.Add("To", messageTypeAttribute2);
-                    MessageAttributeValue messageTypeAttribute3 = new MessageAttributeValue();
-                    messageTypeAttribute3.DataType = "String";
-                    messageTypeAttribute3.StringValue = emailSubject;
+                    MessageAttributeValue messageTypeAttribute3 = new MessageAttributeValue
+                    {
+                        DataType = "String",
+                        StringValue = emailSubject
+                    };
                     MessageAttributes.Add("Subject", messageTypeAttribute3);
-                    MessageAttributeValue messageTypeAttribute4 = new MessageAttributeValue();
-                    messageTypeAttribute4.DataType = "String";
-                    messageTypeAttribute4.StringValue = replyTo;
+                    MessageAttributeValue messageTypeAttribute4 = new MessageAttributeValue
+                    {
+                        DataType = "String",
+                        StringValue = replyTo
+                    };
                     MessageAttributes.Add("ReplyTo", messageTypeAttribute4);
                     sendMessageRequest.MessageAttributes = MessageAttributes;
                     SendMessageResponse sendMessageResponse = await amazonSQSClient.SendMessageAsync(sendMessageRequest);
@@ -1118,7 +1133,7 @@ namespace CheckForLocation
 
             Console.WriteLine(caseReference + " : Sending forward email");
 
-            if (caseDetails.sovereignCouncil.ToLower().Equals("northampton")&&defaultRouting)
+            if (west&&caseDetails.sovereignCouncil.ToLower().Equals("northampton")&&defaultRouting)
             {
                 Console.WriteLine(caseReference + " : Local default case no forward necessary");
             }

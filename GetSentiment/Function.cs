@@ -1,9 +1,7 @@
 using System.Collections.Generic;
 using Amazon.Lambda.Core;
 using System;
-using Amazon.Lex;
 using Amazon;
-using Amazon.Lex.Model;
 using System.Threading.Tasks;
 using Amazon.StepFunctions;
 using Amazon.StepFunctions.Model;
@@ -12,12 +10,14 @@ using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
+using Amazon.Comprehend;
+using Amazon.Comprehend.Model;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]
 
-namespace GetService
+namespace GetSentiment
 {
     public class Function
     {
@@ -30,18 +30,18 @@ namespace GetService
         private static String cxmEndPoint;
         private static String cxmAPIKey;
         private static String tableName = "MailBotCasesTest";
-
-        private Secrets secrets = null;
+        private Secrets secrets;
+        private CaseDetails caseDetails;
 
 
         public async Task FunctionHandler(object input, ILambdaContext context)
         {
             if (await GetSecrets())
             {
-                Boolean liveInstance = false;
                 JObject o = JObject.Parse(input.ToString());
                 caseReference = (string)o.SelectToken("CaseReference");
                 taskToken = (string)o.SelectToken("TaskToken");
+                Boolean liveInstance = false;
                 try
                 {
                     if (context.InvokedFunctionArn.ToLower().Contains("prod"))
@@ -50,22 +50,18 @@ namespace GetService
                         liveInstance = true;
                         tableName = "MailBotCasesLive";
                     }
-                    else
-                    {
-                        Console.WriteLine("Beta Version");
-                    }
                 }
                 catch (Exception)
                 {
-                    Console.WriteLine("Beta Version");
                 }
 
                 if (liveInstance)
                 {
                     cxmEndPoint = secrets.cxmEndPointLive;
                     cxmAPIKey = secrets.cxmAPIKeyLive;
-                    String cxmServiceAreaLive = await GetCaseDetailsAsync();
-                    if (await UpdateCaseDetailsAsync(cxmServiceAreaLive))
+                    caseDetails = await GetCustomerContactAsync();
+                    Sentiment sentimentLive = await GetSentimentFromAWSAsync(caseDetails.customerContact);
+                    if (await UpdateCaseDetailsAsync(sentimentLive))
                     {
                         await SendSuccessAsync();
                     }
@@ -74,8 +70,9 @@ namespace GetService
                 {
                     cxmEndPoint = secrets.cxmEndPointTest;
                     cxmAPIKey = secrets.cxmAPIKeyTest;
-                    String cxmServiceAreaTest = await GetCaseDetailsAsync();
-                    if (await UpdateCaseDetailsAsync(cxmServiceAreaTest))
+                    caseDetails = await GetCustomerContactAsync();
+                    Sentiment sentimentTest = await GetSentimentFromAWSAsync(caseDetails.customerContact);
+                    if (await UpdateCaseDetailsAsync(sentimentTest))
                     {
                         await SendSuccessAsync();
                     }
@@ -83,73 +80,18 @@ namespace GetService
             }
         }
 
-        private async Task<String> GetCaseDetailsAsync()
-        {
-            String cxmServiceArea = null;
-
-            CaseDetails caseDetails = await GetCustomerContactAsync(cxmEndPoint, cxmAPIKey, caseReference, taskToken);
-            try
-            {
-                if (!String.IsNullOrEmpty(caseDetails.customerContact))
-                {
-                    String response = await GetIntentFromLexAsync(caseDetails.customerContact);
-
-                    if (!String.IsNullOrEmpty(response))
-                    {
-                        Console.WriteLine("Service : " + response);
-                        switch (response)
-                        {
-                            case "Feedback":
-                                cxmServiceArea = "customer_feedback_nbc_feedback";
-                                break;
-                            case "EnvironmentalHealth":
-                                cxmServiceArea = "environmental_health";
-                                break;
-                            case "Events":
-                                cxmServiceArea = "events";
-                                break;
-                            case "GeneralEnquiries":
-                                cxmServiceArea = "general_enquiries";
-                                break;
-                            case "HousingCustomerServices":
-                                cxmServiceArea = "housing_customer_services";
-                                break;
-                            case "HousingRepairs":
-                                cxmServiceArea = "housing_repairs";
-                                break;
-                            case "Streetcare":
-                                cxmServiceArea = "streetcare_services_waste_and_recycling_grounds_maintenance";
-                                break;
-                            default:
-                                cxmServiceArea = "general_enquiries";
-                                await SendFailureAsync("Unexpected Intent Returned : " + response, "GetCaseDetailsAsync");
-                                Console.WriteLine("ERROR : Unexpected Intent Returned : " + response);
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        cxmServiceArea = "general_enquiries";
-                    }
-                }
-            }
-            catch (Exception error)
-            {
-                cxmServiceArea = "general_enquiries";
-                await SendFailureAsync(error.Message, "GetCaseDetailsAsync");
-                Console.WriteLine("ERROR : GetCaseDetailsAsync :  " + error.Message);
-            }
-            return cxmServiceArea;
-        }
-
-        private async Task<Boolean> UpdateCaseDetailsAsync(String serviceArea)
+        private async Task<Boolean> UpdateCaseDetailsAsync(Sentiment sentiment)
         {
             HttpClient cxmClient = new HttpClient();
             cxmClient.BaseAddress = new Uri(cxmEndPoint);
             String uri = "/api/service-api/norbert/case/" + caseReference + "/edit?key=" + cxmAPIKey;
             Dictionary<string, string> cxmPayload = new Dictionary<string, string>
             {
-                { "service-area", serviceArea }
+                { "sentiment", sentiment.sentimentRating },
+                { "sentiment-score-mixed", sentiment.sentimentMixed },
+                { "sentiment-score-negative", sentiment.sentimentNegative },
+                { "sentiment-score-neutral", sentiment.sentimentNeutral },
+                { "sentiment-score-positive", sentiment.sentimentPositive }
             };
             String json = JsonConvert.SerializeObject(cxmPayload, Formatting.Indented);
             StringContent content = new StringContent(json);
@@ -159,7 +101,7 @@ namespace GetService
             try
             {
                 response.EnsureSuccessStatusCode();
-                return await StoreServiceToDynamoAsync(caseReference, serviceArea);
+                return await StoreSentimentToDynamoAsync(caseReference, sentiment.sentimentRating);
             }
             catch (Exception error)
             {
@@ -193,7 +135,7 @@ namespace GetService
         }
 
 
-        private async Task<CaseDetails> GetCustomerContactAsync(String cxmEndPoint, String cxmAPIKey, String caseReference, String taskToken)
+        private async Task<CaseDetails> GetCustomerContactAsync()
         {
             CaseDetails caseDetails = new CaseDetails();
             HttpClient cxmClient = new HttpClient();
@@ -213,36 +155,46 @@ namespace GetService
                 else
                 {
                     await SendFailureAsync("Getting case details for " + caseReference, response.StatusCode.ToString());
-                    Console.WriteLine("ERROR : GetCustomerContactAsyncc : " + request.ToString());
-                    Console.WriteLine("ERROR : GetCustomerContactAsync : " + response.StatusCode.ToString());
+                    Console.WriteLine("ERROR : GetStaffResponseAsync : " + request.ToString());
+                    Console.WriteLine("ERROR : GetStaffResponseAsync : " + response.StatusCode.ToString());
                 }
             }
             catch (Exception error)
             {
                 await SendFailureAsync("Getting case details for " + caseReference, error.Message);
-                Console.WriteLine("ERROR : GetCustomerContactAsync : " + error.StackTrace);
+                Console.WriteLine("ERROR : GetStaffResponseAsync : " + error.StackTrace);
             }
             return caseDetails;
         }
 
-        private async Task<string> GetIntentFromLexAsync(String customerContact)
+        private async Task<Sentiment> GetSentimentFromAWSAsync(String customerContact)
         {
+            Sentiment caseSentiment = new Sentiment();
             try
             {
-                AmazonLexClient lexClient = new AmazonLexClient(primaryRegion);
-                PostTextRequest textRequest = new PostTextRequest();
-                textRequest.UserId = "MailBot";
-                textRequest.BotAlias = "DEV";
-                textRequest.BotName = "NBC_Mailbot_Intents";
-                textRequest.InputText = customerContact;
-                PostTextResponse textRespone = await lexClient.PostTextAsync(textRequest);
-                return textRespone.IntentName;
+                AmazonComprehendClient comprehendClient = new AmazonComprehendClient(RegionEndpoint.EUWest2);
+
+                Console.WriteLine("Calling DetectSentiment");
+                DetectSentimentRequest detectSentimentRequest = new DetectSentimentRequest()
+                {
+                    Text = customerContact,
+                    LanguageCode = "en"
+                };
+                DetectSentimentResponse detectSentimentResponse = await comprehendClient.DetectSentimentAsync(detectSentimentRequest);
+                caseSentiment.success = true;
+                caseSentiment.sentimentRating = detectSentimentResponse.Sentiment.ToString().ToLower();
+                caseSentiment.sentimentMixed = ((int)(detectSentimentResponse.SentimentScore.Mixed * 100)).ToString();
+                caseSentiment.sentimentNegative = ((int)(detectSentimentResponse.SentimentScore.Negative * 100)).ToString();
+                caseSentiment.sentimentNeutral = ((int)(detectSentimentResponse.SentimentScore.Neutral * 100)).ToString();
+                caseSentiment.sentimentPositive = ((int)(detectSentimentResponse.SentimentScore.Positive * 100)).ToString();
+                return caseSentiment;
             }
             catch (Exception error)
             {
-                await SendFailureAsync("Getting Intent", error.Message);
-                Console.WriteLine("ERROR : GetIntentFromLexAsync : " + error.StackTrace);
-                return "GeneralEnquiries";
+                caseSentiment.success = false;
+                await SendFailureAsync("Getting Sentiment", error.Message);
+                Console.WriteLine("ERROR : GetSentimentFromAWSAsync : " + error.StackTrace);
+                return caseSentiment;
             }
         }
 
@@ -291,7 +243,7 @@ namespace GetService
             await Task.CompletedTask;
         }
 
-        private async Task<Boolean> StoreServiceToDynamoAsync(String caseReference, String service)
+        private async Task<Boolean> StoreSentimentToDynamoAsync(String caseReference, String sentiment)
         {
             try
             {
@@ -305,11 +257,11 @@ namespace GetService
                         },
                     ExpressionAttributeNames = new Dictionary<string, string>()
                     {
-                        {"#Field", "ProposedService"}
+                        {"#Field", "ProposedSentiment"}
                     },
                     ExpressionAttributeValues = new Dictionary<string, AttributeValue>()
                     {
-                        {":Value",new AttributeValue {S = service}}
+                        {":Value",new AttributeValue {S = sentiment}}
                     },
 
                     UpdateExpression = "SET #Field = :Value"
@@ -331,11 +283,21 @@ namespace GetService
         public String customerContact { get; set; } = "";
     }
 
+    public class Sentiment
+    {
+        public Boolean success { get; set; }
+        public String sentimentRating { get; set; }
+        public String sentimentMixed { get; set; }
+        public String sentimentNegative { get; set; }
+        public String sentimentNeutral { get; set; }
+        public String sentimentPositive { get; set; }
+    }
+
     public class Secrets
     {
-        public string cxmEndPointTest { get; set; }
-        public string cxmEndPointLive { get; set; }
-        public string cxmAPIKeyTest { get; set; }
-        public string cxmAPIKeyLive { get; set; }
+        public String cxmEndPointTest { get; set; }
+        public String cxmEndPointLive { get; set; }
+        public String cxmAPIKeyTest { get; set; }
+        public String cxmAPIKeyLive { get; set; }
     }
 }

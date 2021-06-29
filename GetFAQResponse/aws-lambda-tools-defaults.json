@@ -6,7 +6,7 @@
         "dotnet lambda help",
         "All the command line options for the Lambda command can be specified in this file."
     ],
-    "profile"     : "default",
+    "profile"     : "NNC Prod",
     "region"      : "eu-west-2",
     "configuration" : "Release",
     "framework"     : "netcoreapp3.1",
@@ -15,9 +15,11 @@
     "function-timeout"     : 30,
     "function-handler"     : "GetFAQResponse::GetFAQResponse.Function::FunctionHandler",
     "function-name"        : "GetFAQResponse",
-    "function-description" : "Step Function : Get response from QNA service if above confidence level",
+    "function-description" : "Creates proposed response to customer contact",
     "package-type"         : "Zip",
     "tracing-mode"         : "PassThrough",
     "environment-variables" : "\"minAutoRespondLevel\"=\"80\";\"instance\"=\"test\";\"qnaURL\"=\"https://nbcwebservice.azurewebsites.net/qnamaker/knowledgebases/9e0449aa-e598-4c5f-a848-de61d123f91e/generateAnswer\";\"qnaAuthorization\"=\"EndpointKey d77cb979-073f-4427-8d10-c672fec9e5cd\";\"minConfidenceLevel\"=\"50\"",
-    "image-tag"             : ""
+    "image-tag"             : "",
+    "function-role"         : "arn:aws:iam::418943896884:role/nncLambda",
+    "dead-letter-target-arn" : "arn:aws:sqs:eu-west-2:418943896884:dlq_mailbot"
 }

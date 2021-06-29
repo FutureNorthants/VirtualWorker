@@ -25,7 +25,7 @@ namespace TransferCaseViaEmail
     {
         private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
         private static readonly RegionEndpoint bucketRegion = RegionEndpoint.EUWest2;
-        private static readonly RegionEndpoint sqsRegion = RegionEndpoint.EUWest1;
+        private static RegionEndpoint sqsRegion = RegionEndpoint.EUWest1;
         private static readonly String secretName = "nbcGlobal";
         private static readonly String secretAlias = "AWSCURRENT";
 
@@ -45,6 +45,10 @@ namespace TransferCaseViaEmail
                 Boolean liveInstance = false;
                 JObject inputJson = JObject.Parse(input.ToString());
                 caseReference = (String)inputJson.SelectToken("CaseReference");
+                if (caseReference.ToLower().Contains("emn"))
+                {
+                    sqsRegion = RegionEndpoint.EUWest2;
+                }
                 taskToken = (String)inputJson.SelectToken("TaskToken");
                 try
                 {

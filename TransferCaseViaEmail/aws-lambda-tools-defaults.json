@@ -6,7 +6,7 @@
         "dotnet lambda help",
         "All the command line options for the Lambda command can be specified in this file."
     ],
-    "profile"     : "default",
+    "profile"     : "NNC Prod",
     "region"      : "eu-west-2",
     "configuration" : "Release",
     "framework"     : "netcoreapp3.1",
@@ -15,9 +15,11 @@
     "function-timeout"     : 30,
     "function-handler"     : "TransferCaseViaEmail::TransferCaseViaEmail.Function::FunctionHandler",
     "function-name"        : "TransferCaseViaEmail",
-    "function-description" : "",
+    "function-description" : "Transfer case internally via email",
     "package-type"         : "Zip",
     "tracing-mode"         : "PassThrough",
     "environment-variables" : "",
-    "image-tag"             : ""
+    "image-tag"             : "",
+    "function-role"         : "arn:aws:iam::418943896884:role/nncLambda",
+    "dead-letter-target-arn" : "arn:aws:sqs:eu-west-2:418943896884:dlq_mailbot"
 }
