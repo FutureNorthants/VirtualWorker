@@ -721,60 +721,121 @@ namespace CheckForLocation
                 return sovereignLocation;
             }
 
-            if (emailBody.ToLower().Contains("northampton")||await IsInArea(emailBody.ToLower(),"LocationsNorthampton"))
+            if (west)
             {
-                sovereignLocation.SovereignCouncilName = "Northampton";
-                sovereignLocation.sovereignWest = true;
-                sovereignLocation.Success = true;
-                return sovereignLocation;
-            }
- 
-            if (emailBody.ToLower().Contains("towcester") || await IsInArea(emailBody.ToLower(), "LocationsSouthNorthants"))
-            {
-                sovereignLocation.SovereignCouncilName = "south_northants";
-                sovereignLocation.sovereignWest = true;
-                sovereignLocation.Success = true;
-                return sovereignLocation;
-            }
+                if (emailBody.ToLower().Contains("northampton") || await IsInArea(emailBody.ToLower(), "LocationsNorthampton"))
+                {
+                    sovereignLocation.SovereignCouncilName = "Northampton";
+                    sovereignLocation.sovereignWest = true;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
 
-            if (emailBody.ToLower().Contains("daventry") || await IsInArea(emailBody.ToLower(), "LocationsDaventry"))
-            {
-                sovereignLocation.SovereignCouncilName = "Daventry";
-                sovereignLocation.sovereignWest = true;
-                sovereignLocation.Success = true;
-                return sovereignLocation;
-            }
- 
-            if (emailBody.ToLower().Contains("wellingborough") || await IsInArea(emailBody.ToLower(), "LocationsWellingborough"))
-            {
-                sovereignLocation.SovereignCouncilName = "Wellingborough";
-                sovereignLocation.sovereignWest = false;
-                sovereignLocation.Success = true;
-                return sovereignLocation;
-            }
+                if (emailBody.ToLower().Contains("towcester") || await IsInArea(emailBody.ToLower(), "LocationsSouthNorthants"))
+                {
+                    sovereignLocation.SovereignCouncilName = "south_northants";
+                    sovereignLocation.sovereignWest = true;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
 
-            if (emailBody.ToLower().Contains("kettering") || await IsInArea(emailBody.ToLower(), "LocationsKettering"))
-            {
-                sovereignLocation.SovereignCouncilName = "Kettering";
-                sovereignLocation.sovereignWest = false;
-                sovereignLocation.Success = true;
-                return sovereignLocation;
-            }
+                if (emailBody.ToLower().Contains("daventry") || await IsInArea(emailBody.ToLower(), "LocationsDaventry"))
+                {
+                    sovereignLocation.SovereignCouncilName = "Daventry";
+                    sovereignLocation.sovereignWest = true;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
 
-            if (emailBody.ToLower().Contains("corby") || await IsInArea(emailBody.ToLower(), "LocationsCorby"))
-            {
-                sovereignLocation.SovereignCouncilName = "Corby";
-                sovereignLocation.sovereignWest = false;
-                sovereignLocation.Success = true;
-                return sovereignLocation;
+                if (emailBody.ToLower().Contains("wellingborough") || await IsInArea(emailBody.ToLower(), "LocationsWellingborough"))
+                {
+                    sovereignLocation.SovereignCouncilName = "Wellingborough";
+                    sovereignLocation.sovereignWest = false;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
+
+                if (emailBody.ToLower().Contains("kettering") || await IsInArea(emailBody.ToLower(), "LocationsKettering"))
+                {
+                    sovereignLocation.SovereignCouncilName = "Kettering";
+                    sovereignLocation.sovereignWest = false;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
+
+                if (emailBody.ToLower().Contains("corby") || await IsInArea(emailBody.ToLower(), "LocationsCorby"))
+                {
+                    sovereignLocation.SovereignCouncilName = "Corby";
+                    sovereignLocation.sovereignWest = false;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
+
+                if (emailBody.ToLower().Contains("rushden") || await IsInArea(emailBody.ToLower(), "LocationsEastNorthants"))
+                {
+                    sovereignLocation.SovereignCouncilName = "east_northants";
+                    sovereignLocation.sovereignWest = false;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
             }
- 
-            if (emailBody.ToLower().Contains("rushden") || await IsInArea(emailBody.ToLower(), "LocationsEastNorthants"))
+            else
             {
-                sovereignLocation.SovereignCouncilName = "east_northants";
-                sovereignLocation.sovereignWest = false;
-                sovereignLocation.Success = true;
-                return sovereignLocation;
+                if (emailBody.ToLower().Contains("wellingborough") || await IsInArea(emailBody.ToLower(), "LocationsWellingborough"))
+                {
+                    sovereignLocation.SovereignCouncilName = "Wellingborough";
+                    sovereignLocation.sovereignWest = false;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
+
+                if (emailBody.ToLower().Contains("kettering") || await IsInArea(emailBody.ToLower(), "LocationsKettering"))
+                {
+                    sovereignLocation.SovereignCouncilName = "Kettering";
+                    sovereignLocation.sovereignWest = false;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
+
+                if (emailBody.ToLower().Contains("corby") || await IsInArea(emailBody.ToLower(), "LocationsCorby"))
+                {
+                    sovereignLocation.SovereignCouncilName = "Corby";
+                    sovereignLocation.sovereignWest = false;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
+
+                if (emailBody.ToLower().Contains("rushden") || await IsInArea(emailBody.ToLower(), "LocationsEastNorthants"))
+                {
+                    sovereignLocation.SovereignCouncilName = "east_northants";
+                    sovereignLocation.sovereignWest = false;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
+
+                if (emailBody.ToLower().Contains("towcester") || await IsInArea(emailBody.ToLower(), "LocationsSouthNorthants"))
+                {
+                    sovereignLocation.SovereignCouncilName = "south_northants";
+                    sovereignLocation.sovereignWest = true;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
+
+                if (emailBody.ToLower().Contains("daventry") || await IsInArea(emailBody.ToLower(), "LocationsDaventry"))
+                {
+                    sovereignLocation.SovereignCouncilName = "Daventry";
+                    sovereignLocation.sovereignWest = true;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }
+
+                if (emailBody.ToLower().Contains("northampton") || await IsInArea(emailBody.ToLower(), "LocationsNorthampton"))
+                {
+                    sovereignLocation.SovereignCouncilName = "Northampton";
+                    sovereignLocation.sovereignWest = true;
+                    sovereignLocation.Success = true;
+                    return sovereignLocation;
+                }  
             }
             return sovereignLocation;
         }
