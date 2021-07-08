@@ -51,7 +51,7 @@ namespace CheckForLocation
         private static String caseTable;
         private static String sovereignEmailTable;
         private static String lexAlias;
-        private static String originalEmail = "";
+       // private static String originalEmail = "";
         private static String myAccountEndPoint;
         private static String cxmAPIName;
         private static String orgName;
@@ -305,11 +305,11 @@ namespace CheckForLocation
                         caseDetails.ConfirmationSent = (Boolean)caseSearch.SelectToken("values.confirmation_sent");
                     }
                     catch (Exception) { } 
-                    caseDetails.enquiryDetails = (String)caseSearch.SelectToken("values.enquiry_details");
+                    caseDetails.enquiryDetails = removeSuppressionList(secrets.SuppressWording,(String)caseSearch.SelectToken("values.enquiry_details"));
                     caseDetails.customerHasUpdated = (Boolean)caseSearch.SelectToken("values.customer_has_updated");
                     caseDetails.sovereignCouncil = GetStringValueFromJSON(caseSearch, "values.sovereign_council");
                     caseDetails.sovereignServiceArea = GetStringValueFromJSON(caseSearch, "values.sovereign_service_area");
-                    caseDetails.fullEmail = GetStringValueFromJSON(caseSearch, "values.original_email");
+                    caseDetails.fullEmail = removeSuppressionList(secrets.SuppressWording, GetStringValueFromJSON(caseSearch, "values.original_email"));
                     if (caseReference.ToLower().Contains("emn"))
                     {
                         caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
@@ -350,7 +350,7 @@ namespace CheckForLocation
                 if (!String.IsNullOrEmpty(caseDetails.enquiryDetails))
                 {
 
-                    originalEmail = await GetContactFromDynamoAsync(caseReference);
+                    //originalEmail = await GetContactFromDynamoAsync(caseReference);
                     if (caseDetails.manualReview && west)
                     {
                         String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, caseDetails.sovereignServiceArea);
@@ -387,7 +387,12 @@ namespace CheckForLocation
                     }
                     else 
                     {
-                       sovereignLocation = await CheckForLocationAsync(caseDetails.enquiryDetails);
+                        String searchText = caseDetails.enquiryDetails;
+                        if (caseDetails.customerHasUpdated)
+                        {
+                            searchText = caseDetails.fullEmail + " " + caseDetails.enquiryDetails;
+                        }
+                       sovereignLocation = await CheckForLocationAsync(searchText);
                         if (caseDetails.contactUs && !sovereignLocation.Success)
                         {
                             sovereignLocation = await CheckForLocationAsync(caseDetails.customerAddress);
@@ -403,7 +408,7 @@ namespace CheckForLocation
                         else
                         {
                             Console.WriteLine(caseReference + " : SovereignServiceArea not set using Lex ");
-                            service = await GetServiceAsync(originalEmail);
+                            service = await GetServiceAsync(caseDetails.fullEmail);
                         }                      
 
                         if (sovereignLocation.Success)
@@ -1006,7 +1011,7 @@ namespace CheckForLocation
             return true; ;
         }
 
-        private async Task<String> GetContactFromDynamoAsync(String caseReference)
+        private async Task<String> xGetContactFromDynamoAsync(String caseReference)
         {
             try
             {
@@ -1018,7 +1023,7 @@ namespace CheckForLocation
                     ConsistentRead = true
                 };
                 Document document = await dynamoTable.GetItemAsync(caseReference, config);
-                return document["InitialContact"].AsPrimitive().Value.ToString();
+                return removeSuppressionList(secrets.SuppressWording, document["InitialContact"].AsPrimitive().Value.ToString());
             }
             catch (Exception error)
             {
@@ -1442,6 +1447,17 @@ namespace CheckForLocation
                 return body;
             }
         }
+
+        private static String removeSuppressionList(String suppressionlist, String content)
+        { 
+            String[] words = suppressionlist.Split(',');
+
+            foreach (String word in words)
+            {
+                content = content.ToLower().Replace(word.ToLower(), "");
+            }
+            return content;
+        }
     }
 
 }
@@ -1518,6 +1534,7 @@ namespace CheckForLocation
         public String WncBccAddressLive { get; set; }
         public String NncBccAddressTest { get; set; }
         public String NncBccAddressLive { get; set; }
+        public String SuppressWording { get; set; }
 }
 
     public class Location
