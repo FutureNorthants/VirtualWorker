@@ -167,7 +167,7 @@ namespace TransferCaseViaEmail
                     MessageAttributes.Add("To", messageTypeAttribute2);
                     MessageAttributeValue messageTypeAttribute3 = new MessageAttributeValue();
                     messageTypeAttribute3.DataType = "String";
-                    messageTypeAttribute3.StringValue = "Northampton Borough Council: Your Call Number is " + caseReference; ;
+                    messageTypeAttribute3.StringValue = "West Northants Council: Your Call Number is " + caseReference; ;
                     MessageAttributes.Add("Subject", messageTypeAttribute3);
                     MessageAttributeValue messageTypeAttribute4 = new MessageAttributeValue();
                     messageTypeAttribute4.DataType = "String";
