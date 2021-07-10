@@ -1,6 +1,5 @@
 using Amazon;
 using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Lambda.Core;
 using Amazon.Lex;
@@ -48,10 +47,8 @@ namespace CheckForLocation
         private static String templateBucket;
         private static String sqsEmailURL;
         private static String postCodeURL;
-        private static String caseTable;
         private static String sovereignEmailTable;
         private static String lexAlias;
-       // private static String originalEmail = "";
         private static String myAccountEndPoint;
         private static String cxmAPIName;
         private static String orgName;
@@ -111,7 +108,6 @@ namespace CheckForLocation
                     myAccountEndPoint = secrets.myAccountEndPointLive;
                     if (caseReference.ToLower().Contains("ema"))
                     {
-                        caseTable = secrets.wncEMACasesLive;
                         sovereignEmailTable = "MailBotCouncilsLive";
                         cxmEndPoint = secrets.cxmEndPointLive;
                         cxmAPIKey = secrets.cxmAPIKeyLive;
@@ -135,7 +131,6 @@ namespace CheckForLocation
                         west = false;
                         sqsRegion = RegionEndpoint.EUWest2;
                         emailsRegion = RegionEndpoint.EUWest2;
-                        caseTable = secrets.nncEMNCasesLive;
                         sovereignEmailTable = "MailBotCouncilsLive";
                         cxmEndPoint = secrets.cxmEndPointLiveNorth;
                         cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
@@ -168,7 +163,6 @@ namespace CheckForLocation
                     myAccountEndPoint = secrets.myAccountEndPointLive;
                     if (caseReference.ToLower().Contains("ema"))
                     {
-                        caseTable = secrets.wncEMACasesTest;
                         sovereignEmailTable = "MailBotCouncilsTest";
                         cxmEndPoint = secrets.cxmEndPointTest;
                         cxmAPIKey = secrets.cxmAPIKeyTest;
@@ -192,7 +186,6 @@ namespace CheckForLocation
                         west = false;
                         sqsRegion = RegionEndpoint.EUWest2;
                         emailsRegion = RegionEndpoint.EUWest2;
-                        caseTable = secrets.nncEMNCasesTest;
                         sovereignEmailTable = "MailBotCouncilsTest";
                         cxmEndPoint = secrets.cxmEndPointTestNorth;
                         cxmAPIKey = secrets.cxmAPIKeyTestNorth;
@@ -304,12 +297,13 @@ namespace CheckForLocation
                     {
                         caseDetails.ConfirmationSent = (Boolean)caseSearch.SelectToken("values.confirmation_sent");
                     }
-                    catch (Exception) { } 
-                    caseDetails.enquiryDetails = removeSuppressionList(secrets.SuppressWording,(String)caseSearch.SelectToken("values.enquiry_details"));
+                    catch (Exception) { }
+                    caseDetails.Subject = RemoveSuppressionList(secrets.SuppressWording, GetStringValueFromJSON(caseSearch, "values.subject"));
+                    caseDetails.enquiryDetails = RemoveSuppressionList(secrets.SuppressWording, GetStringValueFromJSON(caseSearch, "values.enquiry_details"));
                     caseDetails.customerHasUpdated = (Boolean)caseSearch.SelectToken("values.customer_has_updated");
                     caseDetails.sovereignCouncil = GetStringValueFromJSON(caseSearch, "values.sovereign_council");
                     caseDetails.sovereignServiceArea = GetStringValueFromJSON(caseSearch, "values.sovereign_service_area");
-                    caseDetails.fullEmail = removeSuppressionList(secrets.SuppressWording, GetStringValueFromJSON(caseSearch, "values.original_email"));
+                    caseDetails.fullEmail = RemoveSuppressionList(secrets.SuppressWording, GetStringValueFromJSON(caseSearch, "values.original_email"));
                     if (caseReference.ToLower().Contains("emn"))
                     {
                         caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
@@ -349,8 +343,6 @@ namespace CheckForLocation
             {
                 if (!String.IsNullOrEmpty(caseDetails.enquiryDetails))
                 {
-
-                    //originalEmail = await GetContactFromDynamoAsync(caseReference);
                     if (caseDetails.manualReview && west)
                     {
                         String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, caseDetails.sovereignServiceArea);
@@ -392,7 +384,7 @@ namespace CheckForLocation
                         {
                             searchText = caseDetails.fullEmail + " " + caseDetails.enquiryDetails;
                         }
-                       sovereignLocation = await CheckForLocationAsync(searchText);
+                       sovereignLocation = await CheckForLocationAsync(caseDetails.Subject + " " + searchText);
                         if (caseDetails.contactUs && !sovereignLocation.Success)
                         {
                             sovereignLocation = await CheckForLocationAsync(caseDetails.customerAddress);
@@ -998,10 +990,8 @@ namespace CheckForLocation
             {
                 HttpWebResponse patchResponse = (HttpWebResponse)patchRequest.GetResponse();
                 String result = "";
-                using (StreamReader reader = new StreamReader(patchResponse.GetResponseStream(), Encoding.Default))
-                {
-                    result = reader.ReadToEnd();
-                }
+                using StreamReader reader = new StreamReader(patchResponse.GetResponseStream(), Encoding.Default);
+                result = reader.ReadToEnd();
             }
             catch (Exception error)
             {
@@ -1009,28 +999,6 @@ namespace CheckForLocation
                 return false;
             }
             return true; ;
-        }
-
-        private async Task<String> xGetContactFromDynamoAsync(String caseReference)
-        {
-            try
-            {
-                AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);
-                Table dynamoTable = Table.LoadTable(dynamoDBClient, caseTable);
-                GetItemOperationConfig config = new GetItemOperationConfig
-                {
-                    AttributesToGet = new List<String> { "InitialContact" },
-                    ConsistentRead = true
-                };
-                Document document = await dynamoTable.GetItemAsync(caseReference, config);
-                return removeSuppressionList(secrets.SuppressWording, document["InitialContact"].AsPrimitive().Value.ToString());
-            }
-            catch (Exception error)
-            {
-                Console.WriteLine("ERROR : GetContactFromDynamoAsync : " + error.Message);
-                Console.WriteLine(error.StackTrace);
-                return "";
-            }
         }
 
         private async Task<string> GetServiceAsync(String customerContact)
@@ -1448,13 +1416,17 @@ namespace CheckForLocation
             }
         }
 
-        private static String removeSuppressionList(String suppressionlist, String content)
+        private static String RemoveSuppressionList(String suppressionlist, String content)
         { 
             String[] words = suppressionlist.Split(',');
 
             foreach (String word in words)
             {
-                content = content.ToLower().Replace(word.ToLower(), "");
+                try 
+                {
+                    content = content.ToLower().Replace(word.ToLower(), "");
+                }
+                catch (Exception) { }              
             }
             return content;
         }
@@ -1475,6 +1447,7 @@ namespace CheckForLocation
         public String customerAddress { get; set; } = "";
         public String telephoneNumber { get; set; } = "";
         public String emailID { get; set; } = "";
+        public String Subject { get; set; } = "";
         public Boolean customerHasUpdated { get; set; } = false;
         public Boolean manualReview { get; set; } = false;
         public Boolean contactUs { get; set; } = false;
@@ -1501,10 +1474,6 @@ namespace CheckForLocation
         public String myAccountEndPointTest { get; set; }
         public String trelloBoardTrainingLabelAWSLexUnitary { get; set; }
         public String trelloBoardTrainingLabelUnitaryService { get; set; }
-        public String wncEMACasesLive { get; set; }
-        public String wncEMACasesTest { get; set; }
-        public String nncEMNCasesLive { get; set; }
-        public String nncEMNCasesTest { get; set; }
         public String cxmEndPointTestNorth { get; set; }
         public String cxmEndPointLiveNorth { get; set; }
         public String cxmAPIKeyTestNorth { get; set; }
