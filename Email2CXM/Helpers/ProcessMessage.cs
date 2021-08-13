@@ -20,6 +20,8 @@ using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
 using System.Linq;
 using HtmlAgilityPack;
+using System.Text.Encodings.Web;
+using RestSharp;
 
 namespace Email2CXM.Helpers
 {
@@ -55,12 +57,14 @@ namespace Email2CXM.Helpers
         public String address { get; set; } = null;
         public String ContactUsTableMapping { get; set; } = null;
 
-        public Boolean create = true;
-        public Boolean unitary = false;
-        public Boolean contactUs = false;
-        public Boolean district = true;
-
+        private Boolean create = true;
+        private Boolean unitary = false;
+        private Boolean contactUs = false;
+        private Boolean district = true;
+        private Boolean fixMyStreet = false;
+        private Boolean bundlerFound = false;
         private Boolean west = true;
+        private Boolean useSigParser = true;
 
         public ProcessMessage()
         {
@@ -73,6 +77,10 @@ namespace Email2CXM.Helpers
             unitary = false;
             contactUs = false;
             district = true;
+            fixMyStreet = false;
+            bundlerFound = false;
+            west = true;
+            useSigParser = true;
             if (bucketName.ToLower().Contains("incoming"))
             {
                 client = new AmazonS3Client(primaryRegion);
@@ -110,7 +118,7 @@ namespace Email2CXM.Helpers
                         {
                             Console.WriteLine(emailFrom + " - Create Case");
                         }
-                        if(emailTo.ToLower().Equals(await GetStringFieldFromDynamoAsync(emailTo.ToLower(),"email", "UnitaryEmailAddresses")))
+                        if (emailTo.ToLower().Equals(await GetStringFieldFromDynamoAsync(emailTo.ToLower(), "email", "UnitaryEmailAddresses")))
                         {
                             unitary = true;
                         }
@@ -118,10 +126,21 @@ namespace Email2CXM.Helpers
                         {
                             west = false;
                         }
-                        if (emailFrom.ToLower().Contains("noreply@northamptonshire.gov.uk")&&message.Subject.ToLower().Contains("northamptonshire council form has been submitted"))
+                        if (emailFrom.ToLower().Contains("noreply@northamptonshire.gov.uk") && message.Subject.ToLower().Contains("northamptonshire council form has been submitted"))
                         {
                             contactUs = true;
+                            useSigParser = false;
                         }
+                        if (emailFrom.ToLower().Contains("fixmystreet.com"))
+                        {
+                            fixMyStreet = true;
+                            useSigParser = false;
+                        }
+                        if (mailToAddresses[0].Address.ToLower().Contains("document"))
+                        {
+                            bundlerFound = true;
+                        }
+
                     }
                     catch (Exception)
                     {
@@ -148,16 +167,16 @@ namespace Email2CXM.Helpers
                         {
                             HtmlDocument emailHTML = new HtmlDocument();
                             emailHTML.LoadHtml(message.HtmlBody);
-                            emailContents =  emailHTML.DocumentNode.InnerText;
-                        }                     
+                            emailContents = emailHTML.DocumentNode.InnerText;
+                        }
                     }
                     else
                     {
                         emailContents = message.TextBody;
-                    } 
+                    }
 
                     String person = "";
-                    Boolean bundlerFound = false;
+
                     String responseFileName = "";
                     String parsedEmailEncoded = "";
                     String parsedEmailUnencoded = "";
@@ -232,12 +251,7 @@ namespace Email2CXM.Helpers
 
                     try
                     {
-                        if (mailToAddresses[0].Address.ToLower().Contains("document"))
-                        {
-                            bundlerFound = true;
-                        }
-                        SigParser.Client sigParserClient = new SigParser.Client(secrets.sigParseKey);
-                        String corporateSignature = await GetSignatureFromDynamoAsync(secrets.homeDomain,"");
+                        String corporateSignature = await GetSignatureFromDynamoAsync(secrets.homeDomain, "");
                         int corporateSignatureLocation = emailContents.IndexOf(corporateSignature);
                         if (corporateSignatureLocation > 0)
                         {
@@ -252,7 +266,7 @@ namespace Email2CXM.Helpers
                         {
                             int domainLocation = mailFromAddresses[currentAddress].Address.IndexOf("@");
                             domainLocation++;
-                            if(mailFromAddresses[currentAddress].Address.ToLower().Equals("customerservices@northamptonshire.gov.uk")) 
+                            if (mailFromAddresses[currentAddress].Address.ToLower().Equals("customerservices@northamptonshire.gov.uk"))
                             {
                                 corporateSignature = await GetSignatureFromDynamoAsync(mailFromAddresses[currentAddress].Address.ToLower().Substring(domainLocation), "2");
                             }
@@ -266,10 +280,10 @@ namespace Email2CXM.Helpers
                                 if (nccSignatureLocation > 0)
                                 {
                                     emailContents = emailContents.Substring(0, nccSignatureLocation);
-                                    emailContents=emailContents.Trim();
+                                    emailContents = emailContents.Trim();
                                 }
                             }
-                            corporateSignatureLocation = emailContents.IndexOf(corporateSignature);                         
+                            corporateSignatureLocation = emailContents.IndexOf(corporateSignature);
                             if (corporateSignatureLocation > 0)
                             {
                                 Console.WriteLine("Corporate Signature Found " + currentAddress);
@@ -281,7 +295,27 @@ namespace Email2CXM.Helpers
                             }
                         }
 
-                        if (contactUs)
+                        if (useSigParser)
+                        {
+                            SigParser.Client sigParserClient = new SigParser.Client(secrets.sigParseKey);
+                            SigParser.EmailParseRequest sigParserRequest = new SigParser.EmailParseRequest { plainbody = emailContents, from_name = firstName + " " + lastName, from_address = emailFrom };
+                            parsedEmailUnencoded = sigParserClient.Parse(sigParserRequest).cleanedemailbody_plain;
+                            if ((parsedEmailUnencoded == null || parsedEmailUnencoded.Contains("___")) && !bundlerFound)
+                            {
+                                Console.WriteLine($"No message found, checking for forwarded message");
+                                parsedEmailUnencoded = sigParserClient.Parse(sigParserRequest).emails[1].cleanedBodyPlain;
+                                emailFrom = sigParserClient.Parse(sigParserRequest).emails[1].from_EmailAddress;
+                                names = sigParserClient.Parse(sigParserRequest).emails[1].from_Name.Split(' ').ToList();
+                                firstName = names.First();
+                                names.RemoveAt(0);
+                                lastName = String.Join(" ", names.ToArray());
+                            }
+                            Console.WriteLine($"Cleaned email body is : {parsedEmailUnencoded}");
+                            parsedEmailEncoded = HttpUtility.UrlEncode(parsedEmailUnencoded);
+                            Console.WriteLine($"Encoded email body is : {parsedEmailEncoded}");
+
+                        }
+                        if(contactUs)
                         {
                             try
                             {
@@ -294,28 +328,28 @@ namespace Email2CXM.Helpers
                             {
                                 int emailAddressStarts = emailContents.ToLower().IndexOf("email address:") + 15;
                                 int emailAddressEnds = emailContents.ToLower().IndexOf("telephone number:");
-                                emailFrom = emailContents.Substring(emailAddressStarts, emailAddressEnds - emailAddressStarts).TrimEnd('\r', '\n'); 
+                                emailFrom = emailContents.Substring(emailAddressStarts, emailAddressEnds - emailAddressStarts).TrimEnd('\r', '\n');
                             }
                             catch { }
                             try
                             {
                                 int firstNameStarts = emailContents.ToLower().IndexOf("first name: ") + 12;
                                 int firstNameEnds = emailContents.ToLower().IndexOf("last name:");
-                                firstName = emailContents.Substring(firstNameStarts, firstNameEnds - firstNameStarts).TrimEnd('\r', '\n'); 
+                                firstName = emailContents.Substring(firstNameStarts, firstNameEnds - firstNameStarts).TrimEnd('\r', '\n');
                             }
                             catch { }
                             try
                             {
                                 int lastNameStarts = emailContents.ToLower().IndexOf("last name: ") + 11;
                                 int lastNameEnds = emailContents.ToLower().IndexOf("email address:");
-                                lastName = emailContents.Substring(lastNameStarts, lastNameEnds - lastNameStarts).TrimEnd('\r', '\n'); 
+                                lastName = emailContents.Substring(lastNameStarts, lastNameEnds - lastNameStarts).TrimEnd('\r', '\n');
                             }
                             catch { }
                             try
                             {
                                 int telNoStarts = emailContents.ToLower().IndexOf("telephone number: ") + 18;
                                 int telNoEnds = emailContents.ToLower().IndexOf("address line 1:");
-                                telNo = emailContents.Substring(telNoStarts, telNoEnds - telNoStarts).TrimEnd('\r', '\n'); 
+                                telNo = emailContents.Substring(telNoStarts, telNoEnds - telNoStarts).TrimEnd('\r', '\n');
                             }
                             catch { }
                             try
@@ -333,7 +367,7 @@ namespace Email2CXM.Helpers
                                 {
                                     address2Ends = emailContents.ToLower().IndexOf("postcode:");
                                 }
-                                address+= emailContents.Substring(address2Starts, address2Ends - address2Starts).TrimEnd('\r', '\n') + ", ";
+                                address += emailContents.Substring(address2Starts, address2Ends - address2Starts).TrimEnd('\r', '\n') + ", ";
                             }
                             catch { }
                             try
@@ -342,18 +376,18 @@ namespace Email2CXM.Helpers
                                 int address3Ends = emailContents.ToLower().IndexOf("postcode:");
                                 if (address3Starts > 16)
                                 {
-                                    address+= emailContents.Substring(address3Starts, address3Ends - address3Starts).TrimEnd('\r', '\n');
-                                }                                
+                                    address += emailContents.Substring(address3Starts, address3Ends - address3Starts).TrimEnd('\r', '\n');
+                                }
                             }
                             catch { }
                             try
                             {
                                 int postcodeStarts = emailContents.ToLower().IndexOf("postcode: ") + 10;
                                 int postcodeEnds = emailContents.Length;
-                                if(postcodeEnds - postcodeStarts<10)
+                                if (postcodeEnds - postcodeStarts < 10)
                                 {
                                     address += ", " + emailContents.Substring(postcodeStarts, postcodeEnds - postcodeStarts).TrimEnd('\r', '\n');
-                                }                             
+                                }
                             }
                             catch { }
                             try
@@ -366,24 +400,27 @@ namespace Email2CXM.Helpers
                             }
                             catch { }
                         }
-                        else 
-                        { 
-                            SigParser.EmailParseRequest sigParserRequest = new SigParser.EmailParseRequest { plainbody = emailContents, from_name = firstName + " " + lastName, from_address = emailFrom };
-                            parsedEmailUnencoded = sigParserClient.Parse(sigParserRequest).cleanedemailbody_plain;
-                            if ((parsedEmailUnencoded == null || parsedEmailUnencoded.Contains("___")) && !bundlerFound)
-                            {
-                                Console.WriteLine($"No message found, checking for forwarded message");
-                                parsedEmailUnencoded = sigParserClient.Parse(sigParserRequest).emails[1].cleanedBodyPlain;
-                                emailFrom = sigParserClient.Parse(sigParserRequest).emails[1].from_EmailAddress;
-                                names = sigParserClient.Parse(sigParserRequest).emails[1].from_Name.Split(' ').ToList();
-                                firstName = names.First();
-                                names.RemoveAt(0);
-                                lastName = String.Join(" ", names.ToArray());
-                            }
-                            Console.WriteLine($"Cleaned email body is : {parsedEmailUnencoded}");
-                            parsedEmailEncoded = HttpUtility.UrlEncode(parsedEmailUnencoded);
-                            Console.WriteLine($"Encoded email body is : {parsedEmailEncoded}");
-                        }  
+
+                        if (fixMyStreet)
+                        {
+                            firstName = FMSDeserializeFirstName(emailContents);
+                            lastName = FMSDeserializeLastName(emailContents);
+                            String description = FMSDeserializeIssueTitle(emailContents);
+                           // parsedEmailEncoded = HttpUtility.UrlEncode(parsedEmailUnencoded);
+                            String lat = FMSDeserializeLat(emailContents);
+                            String lng = FMSDeserializeLng(emailContents);
+                            String northing = FMSDeserializeNorthing(emailContents);
+                            String easting = FMSDeserializeEasting(emailContents);
+                            //type
+                            emailFrom = FMSDeserializeEmail(emailContents);
+                            telNo = FMSDeserializePhone(emailContents);
+                            //contents
+                            String road = FMSDeserializeStreet(emailContents);
+                            //nearest road
+                            //nearest postcode
+                            Boolean myCouncilCaseCreated = await CreateMyCouncilCase("dog_fouling",lat,lng,description,road,"nearest street",emailFrom,telNo,firstName + " " + lastName);
+                            //CreateMyCouncilCase(String problemType, String problemLat, String problemLng, String problemDescription, String problemLocation, String problemStreet, String problemEmail, String problemText, String problemName)
+                        }
                     }
                     catch (Exception error)
                     {
@@ -428,7 +465,7 @@ namespace Email2CXM.Helpers
                     }
 
 
-                    if (emailFrom.Contains(secrets.loopPreventIdentifier) || (emailTo.ToLower().Contains("update") &&(emailFrom.ToLower().Contains("westnorthants.gov.uk") || emailFrom.ToLower().Contains("northnorthants.gov.uk"))))
+                    if (emailFrom.Contains(secrets.loopPreventIdentifier) || (emailTo.ToLower().Contains("update") && (emailFrom.ToLower().Contains("westnorthants.gov.uk") || emailFrom.ToLower().Contains("northnorthants.gov.uk"))))
                     {
                         Console.WriteLine(emailFrom + " - Loop identifier found - no case created or updated : " + keyName);
                     }
@@ -515,7 +552,7 @@ namespace Email2CXM.Helpers
                                 {
                                     await TransitionCaseAsync("awaiting-review");
                                 }
-                            }  
+                            }
                         }
                         else
                         {
@@ -533,10 +570,21 @@ namespace Email2CXM.Helpers
                                     {
                                         cxmSovereignServiceArea = cxmSovereignServiceArea.Substring(cxmSovereignServiceArea.IndexOf("_") + 1);
                                     }
-                                    catch (Exception) { }                                   
+                                    catch (Exception) { }
                                 }
 
                                 Boolean success = true;
+
+                                String telNoField = "";
+
+                                if (west)
+                                {
+                                    telNoField = "telephone-number";
+                                }
+                                else
+                                {
+                                    telNoField = "customer-telephone-number";
+                                }
 
                                 if (contactUs)
                                 {
@@ -551,19 +599,19 @@ namespace Email2CXM.Helpers
                                         { "unitary", unitary },
                                         { "contact-us", contactUs },
                                         { "district", district },
-                                        { "telephone-number", telNo },
+                                        { telNoField, telNo },
                                         { "customer-address", address },
                                         { "email-id", keyName},
                                         { "sovereign-service-area", cxmSovereignServiceArea },
                                         { "original-email", await TrimEmailContents(parsedEmailUnencoded) }
                                     };
-                                    success = await CreateCase(values, parsedEmailUnencoded, message, person, bundlerFound);
+                                    success = await CreateCXMCase(values, parsedEmailUnencoded, message, person, bundlerFound);
                                     if (!success)
                                     {
                                         Console.WriteLine("ERROR - Retrying case without cxmSovereignServiceArea of : " + cxmSovereignServiceArea);
                                     }
                                 }
-                                if(!contactUs||(contactUs&&!success))
+                                if (!contactUs || (contactUs && !success))
                                 {
                                     Dictionary<String, Object> values = new Dictionary<String, Object>
                                     {
@@ -576,14 +624,14 @@ namespace Email2CXM.Helpers
                                         { "unitary", unitary },
                                         { "contact-us", contactUs },
                                         { "district", district },
-                                        { "telephone-number", telNo },
+                                        { telNoField, telNo },
                                         { "customer-address", address },
                                         { "email-id", keyName},
                                         { "original-email", await TrimEmailContents(message.TextBody) }
                                     };
-                                    await CreateCase(values, parsedEmailUnencoded, message, person, bundlerFound);
+                                    await CreateCXMCase(values, parsedEmailUnencoded, message, person, bundlerFound);
                                 }
-                                
+
                                 responseFileName = "email-no-faq.txt";
 
                                 await StoreContactToDynamoAsync(caseReference, parsedEmailUnencoded, unitary);
@@ -639,7 +687,7 @@ namespace Email2CXM.Helpers
             return true;
         }
 
-        private async Task<Boolean> CreateCase(Dictionary<String, Object> values, String parsedEmailUnencoded, MimeMessage message, String person, Boolean bundlerFound)
+        private async Task<Boolean> CreateCXMCase(Dictionary<String, Object> values, String parsedEmailUnencoded, MimeMessage message, String person, Boolean bundlerFound)
         {
             try
             {
@@ -664,7 +712,7 @@ namespace Email2CXM.Helpers
                 Console.WriteLine($"Response from Jadu {responseString}");
 
                 if (responseFromJadu.IsSuccessStatusCode)
-                {               
+                {
                     dynamic jsonResponse = JObject.Parse(responseString);
                     caseReference = jsonResponse.reference;
                     Console.WriteLine($"Case Reference >>>{caseReference}<<<");
@@ -683,7 +731,104 @@ namespace Email2CXM.Helpers
             return true;
         }
 
-        private async Task<String> GetSignatureFromDynamoAsync(String domain, String sigSuffix)
+        private async Task<Boolean> CreateMyCouncilCase(String problemType, String problemLat, String problemLng, String problemDescription, String problemLocation, String problemStreet, String problemEmail, String problemText, String problemName)
+        {
+            HttpClient client = new HttpClient();
+
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            //TODO
+            //client.DefaultRequestHeaders.Add("dataSource", "fixmystreet");
+            client.DefaultRequestHeaders.Add("dataSource", "xamarin");
+            client.DefaultRequestHeaders.Add("DeviceID", "FixMyStreet");
+            client.DefaultRequestHeaders.Add("ProblemNumber", problemType);
+            client.DefaultRequestHeaders.Add("ProblemLatitude", problemLat);
+            client.DefaultRequestHeaders.Add("ProblemLongitude", problemLng);
+            client.DefaultRequestHeaders.Add("ProblemDescription", JavaScriptEncoder.Default.Encode(problemDescription));
+            client.DefaultRequestHeaders.Add("ProblemLocation", JavaScriptEncoder.Default.Encode(problemLocation));
+            client.DefaultRequestHeaders.Add("ProblemStreet", JavaScriptEncoder.Default.Encode(problemStreet));
+            client.DefaultRequestHeaders.Add("ProblemEmail", problemEmail);
+            client.DefaultRequestHeaders.Add("ProblemPhone", problemText);
+            client.DefaultRequestHeaders.Add("ProblemName", JavaScriptEncoder.Default.Encode(problemName));
+            client.DefaultRequestHeaders.Add("ProblemUsedGPS", "true");
+            client.DefaultRequestHeaders.Add("postref", "");
+            HttpContent content = null;
+            //if (Application.Current.Properties["ProblemUsedImage"].ToString().Equals("true"))
+            //{
+            //    client.DefaultRequestHeaders.Add("includesImage", "true");
+            //    MediaFile imageData = Application.Current.Properties["ProblemImage"] as MediaFile;
+            //    content = new StreamContent(imageData.GetStream());
+            //    content.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            //}
+            //else
+            //{
+                client.DefaultRequestHeaders.Add("includesImage", "false");
+            //}
+
+            client.BaseAddress = new Uri("https://api.northampton.digital/vcc-test/mycouncil");
+            //client.BaseAddress = new Uri("http://sonofmycouncil3.pfcm9af6px.eu-west-2.elasticbeanstalk.com/CreateCall");
+
+            try
+            {
+                //HttpResponseMessage response = await client.PostAsync("", content);
+                HttpResponseMessage response = await client.PostAsync("", null);
+                String jsonResult = await response.Content.ReadAsStringAsync();
+                if (jsonResult.Contains("HTTP Status "))
+                {
+                    int errorIndex = jsonResult.IndexOf("HTTP Status ", StringComparison.Ordinal);
+                    Console.WriteLine("ERROR - MyCouncil Case Not Created : " + jsonResult.Substring(errorIndex + 12, 3));
+                    return false;
+                }
+                else
+                {
+                    JObject crmJSONobject = JObject.Parse(jsonResult);
+                    try
+                    {
+                        if (((String)crmJSONobject.SelectToken("result")).Equals("success"))
+                        {
+                            return true;
+                        }
+                        else
+                        {
+                            Console.WriteLine("ERROR : Unexpected response from MyCouncil :" + ((String)crmJSONobject.SelectToken("result")));
+                            return false;
+                        }
+                    }
+                    catch (Exception error)
+                    {
+                        Console.WriteLine("ERROR : Parsing MyCouncil JSON Response :" + error.Message);
+                        Console.WriteLine("ERROR : " + error.StackTrace);
+                        return false;
+                    }
+                } 
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine("ERROR : Sending case to MyCouncil :" + error.Message);
+                Console.WriteLine("ERROR : " + error.StackTrace);
+                return false;
+            }
+        }
+
+        private async Task<Boolean> CreateMyCouncilCase2(String problemType, String problemLat, String problemLng, String problemDescription, String problemLocation, String problemStreet, String problemEmail, String problemText, String problemName)
+        {
+            var client = new RestClient("http://sonofmycouncil3.pfcm9af6px.eu-west-2.elasticbeanstalk.com/CreateCall?" +
+                                        //"problemNumber=Flytip" + 
+                                        "problemNumber=" + problemType + 
+                                        "&phoneNumber=" + problemText +
+                                        "&name=" + JavaScriptEncoder.Default.Encode(problemName) +
+                                        "&emailAddress=" + problemEmail+ 
+                                        "&lat=" + problemLat+ 
+                                        "&lng=-" + problemLng+ 
+                                        "&problemStreet=" + JavaScriptEncoder.Default.Encode(problemStreet) +  
+                                        "&problemDetails=" + JavaScriptEncoder.Default.Encode(problemDescription));
+            client.Timeout = -1;
+            var request = new RestRequest(Method.POST);
+            IRestResponse response = client.Execute(request);
+            Console.WriteLine(response.Content);
+            return true;
+        }
+
+            private async Task<String> GetSignatureFromDynamoAsync(String domain, String sigSuffix)
         {
             Console.WriteLine("GetSignatureFromDynamoAsync : Checking for known email signature for : " + domain + " " + sigSuffix);
             try
@@ -909,6 +1054,162 @@ namespace Email2CXM.Helpers
                 Console.WriteLine("ERROR : ISAutoResponse :" + error.Message);
                 Console.WriteLine(error.StackTrace);
                 return false;
+            }
+        }
+
+        private String FMSDeserializeFirstName(String Email)
+        {
+            try
+            {
+                int fieldStarts = Email.IndexOf("Name") + 4;
+                int fieldEnds = Email.IndexOf("Email", fieldStarts);
+                String name = Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
+                List<String> names = name.Split(' ').ToList();
+                return names.First();
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize Customer First Name");
+                return "";
+            }
+        }
+
+        private String FMSDeserializeLastName(String Email)
+        {
+            try
+            {
+                int fieldStarts = Email.IndexOf("Name") + 4;
+                int fieldEnds = Email.IndexOf("Email", fieldStarts);
+                String name = Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
+                List<String> names = name.Split(' ').ToList();
+                names.RemoveAt(0);
+                return String.Join(" ", names.ToArray());
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize Customer Last Name");
+                return "";
+            }
+        }
+
+        private String FMSDeserializeIssueTitle(String Email)
+        {
+            try
+            {
+                int fieldStarts = Email.IndexOf("the user who reported the problem.") + 34;
+                int fieldEnds = Email.IndexOf("Category:", fieldStarts);
+                return Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize Customer Issue Title");
+                return "";
+            }
+        }
+
+        private String FMSDeserializeEmail(String Email)
+        {
+            try
+            {
+                int fieldStarts = Email.IndexOf("Email") + 5;
+                int fieldEnds = Email.IndexOf("Phone", fieldStarts);
+                return Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                return "";
+            }
+        }
+
+        private String FMSDeserializePhone(String Email)
+        {
+            try
+            {
+                int fieldStarts = Email.IndexOf("Phone") + 5;
+                int fieldEnds = Email.IndexOf("Replies to this", fieldStarts);
+                return Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                return "";
+            }
+        }
+
+        private String FMSDeserializeNorthing(String Email)
+        {
+            try
+            {
+                int fieldStarts = Email.IndexOf("Easting/Northing: ") + 25;
+                return Email.Substring(fieldStarts, 6).TrimEnd('\r', '\n');
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                return "";
+            }
+        }
+
+        private String FMSDeserializeEasting(String Email)
+        {
+            try
+            {
+                int fieldStarts = Email.IndexOf("Easting/Northing: ") + 18;
+                return Email.Substring(fieldStarts, 6).TrimEnd('\r', '\n');
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                return "";
+            }
+        }
+
+        private String FMSDeserializeLat(String Email)
+        {
+            try
+            {
+                int approxStart = Email.IndexOf("Easting/Northing");
+                int fieldStarts = Email.IndexOf(" (", approxStart) + 2;
+                int fieldEnds = Email.IndexOf(", ", fieldStarts);
+                return Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                return "";
+            }
+        }
+
+        private String FMSDeserializeLng(String Email)
+        {
+            try
+            {
+                int approxStart = Email.IndexOf("Easting/Northing");
+                int fieldStarts = Email.IndexOf(", ", approxStart) + 2;
+                int fieldEnds = Email.IndexOf(")", fieldStarts);
+                return Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                return "";
+            }
+        }
+
+        private String FMSDeserializeStreet(String Email)
+        {
+            try
+            {
+                int approxStart = Email.IndexOf("Nearest road to the pin placed on the map");
+                int fieldStarts = Email.IndexOf(": ", approxStart) + 2;
+                int fieldEnds = Email.IndexOf("Nearest postcode", fieldStarts);
+                return Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                return "";
             }
         }
     }
