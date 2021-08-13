@@ -11,8 +11,8 @@
     <PackageReference Include="Amazon.Lambda.Core" Version="2.0.0" />
     <PackageReference Include="Amazon.Lambda.S3Events" Version="2.0.1" />
     <PackageReference Include="Amazon.Lambda.Serialization.Json" Version="2.0.0" />
-    <PackageReference Include="AWSSDK.S3" Version="3.7.0.8" />
-    <PackageReference Include="AWSSDK.SecretsManager" Version="3.7.0.7" />
-    <PackageReference Include="AWSSDK.SQS" Version="3.7.0.8" />
+    <PackageReference Include="AWSSDK.S3" Version="3.7.1.7" />
+    <PackageReference Include="AWSSDK.SecretsManager" Version="3.7.0.35" />
+    <PackageReference Include="AWSSDK.SQS" Version="3.7.0.36" />
   </ItemGroup>
 </Project>
