@@ -75,6 +75,7 @@ namespace CheckForLocation
                 preventOutOfArea = true;
                 defaultRouting = false;
                 outOfArea = false;
+                customerReopened = false;
 
                 templateBucket = secrets.templateBucketTest;
                 postCodeURL = secrets.postcodeURLTest;
@@ -303,6 +304,7 @@ namespace CheckForLocation
                     if (caseReference.ToLower().Contains("emn"))
                     {
                         caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
+                        caseDetails.telephoneNumber = (String)caseSearch.SelectToken("values.customer_telephone_number");
                         caseDetails.nncForwardEMailTo = GetStringValueFromJSON(caseSearch, "values.forward_email_to");
                         caseDetails.contactUs = (Boolean)caseSearch.SelectToken("values.emn_contact_us");
                         try
