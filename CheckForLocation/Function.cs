@@ -361,14 +361,17 @@ namespace CheckForLocation
                         defaultRouting = true;
                     }
                     success = await SendEmails(caseDetails, forwardingEmailAddress, true);
-                    caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
-                    if (caseDetails.sovereignCouncil.ToLower().Equals("northampton") && defaultRouting)
+                    if (success)
                     {
-                        await TransitionCaseAsync("awaiting-review");
-                    }
-                    else
-                    {
-                        await TransitionCaseAsync("close-case");
+                        caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
+                        if (caseDetails.sovereignCouncil.ToLower().Equals("northampton") && defaultRouting)
+                        {
+                            await TransitionCaseAsync("awaiting-review");
+                        }
+                        else
+                        {
+                            await TransitionCaseAsync("close-case");
+                        }
                     }
                 }
                 else if (caseDetails.manualReview)
@@ -384,7 +387,10 @@ namespace CheckForLocation
                     {
                         success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer);
                     }
-                    await TransitionCaseAsync("close-case");
+                    if (success)
+                    {
+                        await TransitionCaseAsync("close-case");
+                    }                  
                 }
                 else
                 {
@@ -463,16 +469,19 @@ namespace CheckForLocation
                                 outOfArea = true;
                             }
                             success = await SendEmails(caseDetails, forwardingEmailAddress, true);
-                            if (west && sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton") && defaultRouting)
+                            if (success)
                             {
-                                UpdateCaseBoolean("unitary", false);
-                                UpdateCaseString("email-comments", "Transitioning case to local process");
-                                await TransitionCaseAsync("awaiting-review");
-                            }
-                            else
-                            {
-                                UpdateCaseString("email-comments", "Closing case");
-                                await TransitionCaseAsync("close-case");
+                                if (west && sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton") && defaultRouting)
+                                {
+                                    UpdateCaseBoolean("unitary", false);
+                                    UpdateCaseString("email-comments", "Transitioning case to local process");
+                                    await TransitionCaseAsync("awaiting-review");
+                                }
+                                else
+                                {
+                                    UpdateCaseString("email-comments", "Closing case");
+                                    await TransitionCaseAsync("close-case");
+                                }
                             }
                         }
                     }
@@ -1298,41 +1307,56 @@ namespace CheckForLocation
         {
             using (AmazonSimpleEmailServiceClient client = new AmazonSimpleEmailServiceClient(RegionEndpoint.EUWest1))
             {
-                SendRawEmailRequest sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, textBody, bccAddress, includeOriginalEmail)) };
                 try
                 {
+                    SendRawEmailRequest sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, textBody, bccAddress, includeOriginalEmail)) };
                     SendRawEmailResponse response = await client.SendRawEmailAsync(sendRequest);
                     return true;
                 }
-                catch (Exception error)
+                catch(Exception error)
                 {
                     Console.WriteLine(caseReference + " : Error Sending Raw Email : " + error.Message);
                     return false;
                 }
+  
             }
         }
 
-        private static async Task<MemoryStream> GetMessageStreamAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
+        private async Task<MemoryStream> GetMessageStreamAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
         {
             MemoryStream stream = new MemoryStream();
-            MimeMessage message = await GetMessageAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, textBody, bccAddress, includeOriginalEmail);
-            message.WriteTo(stream);
-            return stream;
+            try
+            {
+                MimeMessage message = await GetMessageAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, textBody, bccAddress, includeOriginalEmail);
+                message.WriteTo(stream);
+                return stream;
+            }
+            catch(ApplicationException)
+            {
+                throw new ApplicationException();
+            }        
         }
 
-        private static async Task<MimeMessage> GetMessageAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
+        private async Task<MimeMessage> GetMessageAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
         {
             MimeMessage message = new MimeMessage();
             message.From.Add(new MailboxAddress(from, fromAddress));
             message.To.Add(new MailboxAddress(string.Empty, toAddress));
             message.Bcc.Add(new MailboxAddress(string.Empty, bccAddress));
             message.Subject = subject;
-            BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
-            message.Body = bodyBuilder.ToMessageBody();
-            return message;
+            try
+            {
+                BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
+                message.Body = bodyBuilder.ToMessageBody();
+                return message;
+            }
+            catch (ApplicationException)
+            {
+                throw new ApplicationException();
+            }
         }
 
-        private static async Task<BodyBuilder> GetMessageBodyAsync(String emailID, String htmlBody, String textBody, Boolean includeOriginalEmail)
+        private async Task<BodyBuilder> GetMessageBodyAsync(String emailID, String htmlBody, String textBody, Boolean includeOriginalEmail)
         {
             BodyBuilder body = new BodyBuilder()
             {
@@ -1342,27 +1366,38 @@ namespace CheckForLocation
 
             if (includeOriginalEmail)
             {
-                AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
-                GetObjectResponse image = await s3.GetObjectAsync(emailBucket, emailID);
-                byte[] imageBytes = new byte[image.ContentLength];
-                using (MemoryStream ms = new MemoryStream())
+                try
                 {
-                    int read;
-                    byte[] buffer = new byte[16 * 1024];
-                    while ((read = image.ResponseStream.Read(buffer, 0, buffer.Length)) > 0)
+                    AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
+                    GetObjectResponse image = await s3.GetObjectAsync(emailBucket, emailID);
+                    byte[] imageBytes = new byte[image.ContentLength];
+                    using (MemoryStream ms = new MemoryStream())
                     {
-                        ms.Write(buffer, 0, read);
-                    }
-                    try
-                    {
+                        int read;
+                        byte[] buffer = new byte[16 * 1024];
+                        while ((read = image.ResponseStream.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            ms.Write(buffer, 0, read);
+                        }
                         imageBytes = ms.ToArray();
                         body.Attachments.Add(caseReference + ".eml", imageBytes);
                     }
-                    catch (Exception error)
-                    {
-                        Console.WriteLine(caseReference + " : Error Attaching original email : " + error.Message);
-                    }
                 }
+                catch(Exception error)
+                {
+                    UpdateCaseString("email-comments", "Failed attach original email");
+                    if (west)
+                    {
+                       await TransitionCaseAsync("unitary-awaiting-review");
+                    }
+                    else
+                    { 
+                       await TransitionCaseAsync("hub-awaiting-review");
+                    }
+                    Console.WriteLine(caseReference + " : Error Attaching original email : " + error.Message);
+                    throw new ApplicationException();
+                }
+ 
             }
             return body;
 
