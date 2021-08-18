@@ -37,6 +37,7 @@ namespace SendResponseToCustomer
         private static String cxmEndPoint;
         private static String cxmAPIKey;
         private static String dynamoTable = "MailBotCasesTest";
+        private static String sqsEmailURL;
         private Boolean liveInstance = false;
 
         private Secrets secrets = null;
@@ -78,6 +79,7 @@ namespace SendResponseToCustomer
                 {
                     cxmEndPoint = secrets.cxmEndPointLive;
                     cxmAPIKey = secrets.cxmAPIKeyLive;
+                    sqsEmailURL = secrets.SqsEmailURLLive;
                     CaseDetails caseDetailsLive = await GetCaseDetailsAsync();
                     await ProcessCaseAsync(caseDetailsLive, suppressResponse);
                     await SendSuccessAsync();
@@ -86,6 +88,7 @@ namespace SendResponseToCustomer
                 {
                     cxmEndPoint = secrets.cxmEndPointTest;
                     cxmAPIKey = secrets.cxmAPIKeyTest;
+                    sqsEmailURL = secrets.SqsEmailURLTest;
                     CaseDetails caseDetailsTest = await GetCaseDetailsAsync();
                     await ProcessCaseAsync(caseDetailsTest, suppressResponse);
                     await SendSuccessAsync();
@@ -283,7 +286,7 @@ namespace SendResponseToCustomer
                     try
                     {
                         SendMessageRequest sendMessageRequest = new SendMessageRequest();
-                        sendMessageRequest.QueueUrl = secrets.sqsEmailURL;
+                        sendMessageRequest.QueueUrl = sqsEmailURL;
                         sendMessageRequest.MessageBody = emailBody;
                         Dictionary<string, MessageAttributeValue> MessageAttributes = new Dictionary<string, MessageAttributeValue>();
                         MessageAttributeValue messageTypeAttribute1 = new MessageAttributeValue();
@@ -449,6 +452,7 @@ namespace SendResponseToCustomer
         public string cxmEndPointLive { get; set; }
         public string cxmAPIKeyTest { get; set; }
         public string cxmAPIKeyLive { get; set; }
-        public string sqsEmailURL { get; set; }
+        public String SqsEmailURLLive { get; set; }
+        public String SqsEmailURLTest { get; set; }
     }
 }
