@@ -13,6 +13,7 @@
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.0.36" />
     <PackageReference Include="AWSSDK.S3" Version="3.7.1.7" />
     <PackageReference Include="AWSSDK.SecretsManager" Version="3.7.0.35" />
+    <PackageReference Include="AWSSDK.SimpleEmail" Version="3.7.0.35" />
     <PackageReference Include="AWSSDK.SQS" Version="3.7.0.36" />
     <PackageReference Include="AWSSDK.StepFunctions" Version="3.7.0.35" />
     <PackageReference Include="MimeKit" Version="2.13.0" />
