@@ -229,35 +229,59 @@ namespace CheckForLocation
         private String FormatLinks(CaseDetails caseDetails)
         {
             String links = "";
+            String instanceText = "test";
+            if (liveInstance)
+            {
+                instanceText = "prod";
+            }
             if (west)
             {
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("northampton")) 
                 {
-                    links += "Redirect to Northampton<BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northampton" + "\">Redirect to Northampton</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("south_northants"))
                 {
-                    links += "Redirect to South Northants<BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "south_northants" + "\">Redirect to South Northants</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("daventry"))
                 {
-                    links += "Redirect to Daventry<BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "daventry" + "\">Redirect to Daventry</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("northamptonshire"))
                 {
-                    links += "Redirect to Northamptonshire<BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northamptonshire" + "\">Redirect to County</a><BR>";
                 }
             }
             else
             {
-                //	northamptonshire
-                //	wellingborough
-                // 	corby
-                // 	east_northants
-                //	kettering
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("wellingborough"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "wellingborough" + "\">Redirect to Wellingborough</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("corby"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "corby" + "\">Redirect to Corby</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("east_northants"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "east_northants" + "\">Redirect to East Northants</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("kettering"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "kettering" + "\">Redirect to Kettering</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("northamptonshire"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northamptonshire" + "\">Redirect to County</a><BR>";
+                }
             }
             return links;
         }
@@ -686,7 +710,7 @@ namespace CheckForLocation
                 {
                     emailBody = emailBody.Replace("KKK", caseDetails.customerEmail);
                 }
-                emailBody = emailBody.Replace("YYY", FormatLinks());
+                emailBody = emailBody.Replace("YYY", FormatLinks(caseDetails));
             }
             catch (Exception error)
             {
@@ -1593,6 +1617,7 @@ public class Secrets
     public String OrganisationNameShort { get; set; }
     public String botPersona1 { get; set; }
     public String botPersona2 { get; set; }
+    public String RedirectURI { get; set; }
 }
 
 public class Location
