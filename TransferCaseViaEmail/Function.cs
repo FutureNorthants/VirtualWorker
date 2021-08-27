@@ -112,8 +112,13 @@ namespace TransferCaseViaEmail
                 }
                 caseDetails = await GetCustomerContactAsync();
                 String emailContents = await FormatEmailAsync();
+                Boolean includeOriginalEmail = true;
+                if (caseDetails.XfpContactUs)
+                {
+                    includeOriginalEmail = false;
+                }
 
-                if (await SendEmailAsync(secrets.OrganisationNameShort, norbertSendFrom, caseDetails.emailTo, bccEmailAddress, "West Northants Council: Your Call Number is " + caseReference, caseDetails.emailID, emailContents, "", true))
+                if (await SendEmailAsync(secrets.OrganisationNameShort, norbertSendFrom, caseDetails.emailTo, bccEmailAddress, "West Northants Council: Your Call Number is " + caseReference, caseDetails.emailID, emailContents, "", includeOriginalEmail))
                 {
                     await TransitionCaseAsync("close-case");
                     await SendSuccessAsync();
@@ -172,7 +177,15 @@ namespace TransferCaseViaEmail
                 {
                     tempDetails = HttpUtility.HtmlEncode(caseDetails.enquiryDetails) + "<BR><BR>";
                 }
-                emailBody = emailBody.Replace("FFF", tempDetails + HttpUtility.HtmlEncode(caseDetails.FullEmail));
+                if(caseDetails.XfpContactUs)
+                {
+                    emailBody = emailBody.Replace("FFF", tempDetails + HttpUtility.HtmlEncode(caseDetails.enquiryDetails));
+                }
+                else
+                {
+                    emailBody = emailBody.Replace("FFF", tempDetails + HttpUtility.HtmlEncode(caseDetails.FullEmail));
+                }
+                
             }
             catch (Exception error)
             {
@@ -208,6 +221,14 @@ namespace TransferCaseViaEmail
                     caseDetails.emailTo = (String)caseSearch.SelectToken("values.forward_email_to");
                     caseDetails.emailFrom = (String)caseSearch.SelectToken("values.email");
                     caseDetails.enquiryDetails = (String)caseSearch.SelectToken("values.enquiry_details");
+                    try
+                    {
+                        if (GetStringValueFromJSON(caseSearch, "values.xfp_case_type").ToLower().Equals("contact us"))
+                        {
+                            caseDetails.XfpContactUs = true;
+                        }
+                    }
+                    catch (Exception) { }
                     try
                     {
                         caseDetails.emailID = (String)caseSearch.SelectToken("values.email_id");
@@ -260,7 +281,7 @@ namespace TransferCaseViaEmail
             return returnValue;
         }
 
-            private async Task SendSuccessAsync()
+        private async Task SendSuccessAsync()
         {
             AmazonStepFunctionsClient client = new AmazonStepFunctionsClient();
             SendTaskSuccessRequest successRequest = new SendTaskSuccessRequest();
@@ -388,6 +409,7 @@ namespace TransferCaseViaEmail
         public String FullEmail { get; set; } = "";
         public String emailID { get; set; } = "";
         public Boolean CustomerHasUpdated { get; set; } = false;
+        public Boolean XfpContactUs { get; set; } = false;
     }
 
     public class Sentiment
