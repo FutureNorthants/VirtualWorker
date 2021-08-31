@@ -56,8 +56,8 @@ namespace Email2CXM
                 //bucket = "nnc.incoming.emails.test";
                 bucket = "norbert.emails.test";
                 //bucket = "nnc.emails.test";
-                //file = "megan1";
-                file = "1ucvqp3e74p39aj50iqre09qnpfhhjlfpjom2no1";
+                file = "megan1";
+                //file = "0r191jsek9unisn8fbvd4q74m18hdof30h4tjpo1";
             }
  
 

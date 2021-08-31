@@ -66,6 +66,8 @@ namespace Email2CXM.Helpers
         private Boolean west = true;
         private Boolean useSigParser = true;
 
+        private MimeMessage message = null;
+
         public ProcessMessage()
         {
             client = new AmazonS3Client(bucketRegion);
@@ -81,6 +83,8 @@ namespace Email2CXM.Helpers
             bundlerFound = false;
             west = true;
             useSigParser = true;
+            message = null;
+
             if (bucketName.ToLower().Contains("incoming"))
             {
                 client = new AmazonS3Client(primaryRegion);
@@ -100,7 +104,7 @@ namespace Email2CXM.Helpers
                 };
                 using (GetObjectResponse response = await client.GetObjectAsync(request))
                 {
-                    MimeMessage message = MimeMessage.Load(response.ResponseStream);
+                    message = MimeMessage.Load(response.ResponseStream);
                     MailAddressCollection mailFromAddresses = (MailAddressCollection)message.From;
                     MailAddressCollection mailToAddresses = (MailAddressCollection)message.To;
 
@@ -407,7 +411,6 @@ namespace Email2CXM.Helpers
                             firstName = FMSDeserializeFirstName(emailContents);
                             lastName = FMSDeserializeLastName(emailContents);
                             String description = FMSDeserializeIssueTitle(emailContents);
-                           // parsedEmailEncoded = HttpUtility.UrlEncode(parsedEmailUnencoded);
                             String lat = FMSDeserializeLat(emailContents);
                             String lng = FMSDeserializeLng(emailContents);
                             String northing = FMSDeserializeNorthing(emailContents);
@@ -415,11 +418,13 @@ namespace Email2CXM.Helpers
                             //type
                             emailFrom = FMSDeserializeEmail(emailContents);
                             telNo = FMSDeserializePhone(emailContents);
-                            //contents
                             String road = FMSDeserializeStreet(emailContents);
-                            //nearest road
-                            //nearest postcode
-                            Boolean myCouncilCaseCreated = await CreateMyCouncilCase("dog_fouling",lat,lng,description,road,"nearest street",emailFrom,telNo,firstName + " " + lastName);
+                            String postcode = FMSDeserializePostcode(emailContents);
+                            String temp = await GetUSRN(lat, lng);
+                            String type = await GetStringFieldFromDynamoAsync(FMSDeserializeCategory(message.HtmlBody), "MyCouncilCategory", "FixMyStreetCategory");
+                            Boolean myCouncilCaseCreated = await CreateMyCouncilCase(type,lat,lng,description,road,"nearest street",emailFrom,telNo,firstName + " " + lastName);
+                            //TODO Transition to with-digital if no type match
+                            //TODO transition to with-digital if no usrn
                             //CreateMyCouncilCase(String problemType, String problemLat, String problemLng, String problemDescription, String problemLocation, String problemStreet, String problemEmail, String problemText, String problemName)
                         }
                     }
@@ -765,9 +770,9 @@ namespace Email2CXM.Helpers
                 client.DefaultRequestHeaders.Add("includesImage", "false");
             //}
 
+            //TODO Live and secrets 
             client.BaseAddress = new Uri("https://api.northampton.digital/vcc-test/mycouncil");
-            //client.BaseAddress = new Uri("http://sonofmycouncil3.pfcm9af6px.eu-west-2.elasticbeanstalk.com/CreateCall");
-
+ 
             try
             {
                 //HttpResponseMessage response = await client.PostAsync("", content);
@@ -810,25 +815,6 @@ namespace Email2CXM.Helpers
             }
         }
 
-        private async Task<Boolean> CreateMyCouncilCase2(String problemType, String problemLat, String problemLng, String problemDescription, String problemLocation, String problemStreet, String problemEmail, String problemText, String problemName)
-        {
-            var client = new RestClient("http://sonofmycouncil3.pfcm9af6px.eu-west-2.elasticbeanstalk.com/CreateCall?" +
-                                        //"problemNumber=Flytip" + 
-                                        "problemNumber=" + problemType + 
-                                        "&phoneNumber=" + problemText +
-                                        "&name=" + JavaScriptEncoder.Default.Encode(problemName) +
-                                        "&emailAddress=" + problemEmail+ 
-                                        "&lat=" + problemLat+ 
-                                        "&lng=-" + problemLng+ 
-                                        "&problemStreet=" + JavaScriptEncoder.Default.Encode(problemStreet) +  
-                                        "&problemDetails=" + JavaScriptEncoder.Default.Encode(problemDescription));
-            client.Timeout = -1;
-            var request = new RestRequest(Method.POST);
-            IRestResponse response = client.Execute(request);
-            Console.WriteLine(response.Content);
-            return true;
-        }
-
             private async Task<String> GetSignatureFromDynamoAsync(String domain, String sigSuffix)
         {
             Console.WriteLine("GetSignatureFromDynamoAsync : Checking for known email signature for : " + domain + " " + sigSuffix);
@@ -865,7 +851,7 @@ namespace Email2CXM.Helpers
                     AttributesToGet = new List<String> { field },
                     ConsistentRead = true
                 };
-                Document document = await table.GetItemAsync(key, config);
+                Document document = await table.GetItemAsync(key.ToLower(), config);
                 return document[field].AsPrimitive().Value.ToString();
             }
             catch (Exception error)
@@ -874,7 +860,40 @@ namespace Email2CXM.Helpers
                 Console.WriteLine(error.StackTrace);
                 return "";
             }
+        }
 
+        private async Task<String> GetUSRN(String lat, String lng)
+        {
+            HttpClient client = new HttpClient();
+            //TODO Live and secrets 
+            client.BaseAddress = new Uri("https://api.northampton.digital/vcc/getstreetbylatlng");
+
+            try
+            {
+                //HttpResponseMessage response = await client.PostAsync("", content);
+                HttpResponseMessage response = await client.GetAsync("?lat=" + lat + "&lng=" + lng);
+                String jsonResult = await response.Content.ReadAsStringAsync();
+
+                 Console.WriteLine($"Response from API {jsonResult}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    dynamic jsonResponse = JObject.Parse(jsonResult);
+                    String temp = jsonResponse.results[0][0];
+                    return temp;
+                }
+                else
+                {
+                    Console.WriteLine($"ERROR - GetUSRN : Error Code from API : " + response.StatusCode);
+                    throw new ApplicationException();
+                }
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine("ERROR : GetUSRN :" + error.Message);
+                Console.WriteLine("ERROR : " + error.StackTrace);
+                throw new ApplicationException();
+            }
         }
 
         private async Task<Boolean> StoreContactToDynamoAsync(String caseReference, String contact, Boolean unitary)
@@ -1133,7 +1152,7 @@ namespace Email2CXM.Helpers
             }
             catch
             {
-                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                Console.WriteLine("WARNING : Unable to deserialize FMS Phone");
                 return "";
             }
         }
@@ -1147,7 +1166,7 @@ namespace Email2CXM.Helpers
             }
             catch
             {
-                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                Console.WriteLine("WARNING : Unable to deserialize FMS Northing");
                 return "";
             }
         }
@@ -1161,7 +1180,7 @@ namespace Email2CXM.Helpers
             }
             catch
             {
-                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                Console.WriteLine("WARNING : Unable to deserialize FMS Easting");
                 return "";
             }
         }
@@ -1177,7 +1196,7 @@ namespace Email2CXM.Helpers
             }
             catch
             {
-                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                Console.WriteLine("WARNING : Unable to deserialize FMS Latitude");
                 return "";
             }
         }
@@ -1193,7 +1212,7 @@ namespace Email2CXM.Helpers
             }
             catch
             {
-                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                Console.WriteLine("WARNING : Unable to deserialize FMS Longtitude");
                 return "";
             }
         }
@@ -1209,7 +1228,38 @@ namespace Email2CXM.Helpers
             }
             catch
             {
-                Console.WriteLine("WARNING : Unable to deserialize Customer Email");
+                Console.WriteLine("WARNING : Unable to deserialize FMS Street");
+                return "";
+            }
+        }
+
+        private String FMSDeserializePostcode(String Email)
+        {
+            try
+            {
+                int approxStart = Email.IndexOf("Nearest postcode to the pin placed on the map");
+                int fieldStarts = Email.IndexOf(": ", approxStart) + 2;
+                int fieldEnds = Email.IndexOf("(", fieldStarts);
+                return Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize FMS Postcode");
+                return "";
+            }
+        }
+
+        private String FMSDeserializeCategory(String Email)
+        {
+            try
+            {
+                int fieldStarts = Email.IndexOf("<strong>Category:</strong> ") + 27;
+                int fieldEnds = Email.IndexOf("</p>", fieldStarts);
+                return Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize FMS Category");
                 return "";
             }
         }
