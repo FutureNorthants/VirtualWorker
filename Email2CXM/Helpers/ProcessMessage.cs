@@ -43,19 +43,20 @@ namespace Email2CXM.Helpers
         private Secrets secrets = null;
 
         private static IAmazonS3 client;
-        private String emailFrom { get; set; } = null;
-        private String emailTo { get; set; } = null;
-        private String subject { get; set; } = null;
-        private String serviceArea { get; set; } = null;
-        private String AutoResponseTable = null;
-        public String firstName { get; set; } = null;
-        public String lastName { get; set; } = null;
-        public String emailBody { get; set; } = null;
-        public String caseReference { get; set; } = null;
-        public String emailContents { get; set; } = null;
-        public String telNo { get; set; } = null;
-        public String address { get; set; } = null;
-        public String ContactUsTableMapping { get; set; } = null;
+        private string EmailFrom { get; set; } = null;
+        private string EmailTo { get; set; } = null;
+        private string Subject { get; set; } = null;
+        private string serviceArea { get; set; } = null;
+        private string AutoResponseTable = null;
+        public string firstName { get; set; } = null;
+        public string lastName { get; set; } = null;
+        public string emailBody { get; set; } = null;
+        public string caseReference { get; set; } = null;
+        public string emailContents { get; set; } = null;
+        public string telNo { get; set; } = null;
+        public string address { get; set; } = null;
+        public string ContactUsTableMapping { get; set; } = null;
+        private string MyCouncilEndPoint = "";
 
         private Boolean create = true;
         private Boolean unitary = false;
@@ -110,32 +111,32 @@ namespace Email2CXM.Helpers
 
                     try
                     {
-                        emailTo = mailToAddresses[0].Address.ToString().ToLower();
-                        emailFrom = mailFromAddresses[0].Address.ToString().ToLower();
-                        Console.WriteLine(emailFrom + " - Processing email sent to this address : " + emailTo);
-                        if (emailTo.Contains("update"))
+                        EmailTo = mailToAddresses[0].Address.ToString().ToLower();
+                        EmailFrom = mailFromAddresses[0].Address.ToString().ToLower();
+                        Console.WriteLine(EmailFrom + " - Processing email sent to this address : " + EmailTo);
+                        if (EmailTo.Contains("update"))
                         {
-                            Console.WriteLine(emailFrom + " - Update Case");
+                            Console.WriteLine(EmailFrom + " - Update Case");
                             create = false;
                         }
                         else
                         {
-                            Console.WriteLine(emailFrom + " - Create Case");
+                            Console.WriteLine(EmailFrom + " - Create Case");
                         }
-                        if (emailTo.ToLower().Equals(await GetStringFieldFromDynamoAsync(emailTo.ToLower(), "email", "UnitaryEmailAddresses")))
+                        if (EmailTo.ToLower().Equals(await GetStringFieldFromDynamoAsync(EmailTo.ToLower(), "email", "UnitaryEmailAddresses")))
                         {
                             unitary = true;
                         }
-                        if (emailTo.ToLower().Contains("northnorthants"))
+                        if (EmailTo.ToLower().Contains("northnorthants"))
                         {
                             west = false;
                         }
-                        if (emailFrom.ToLower().Contains("noreply@northamptonshire.gov.uk") && message.Subject.ToLower().Contains("northamptonshire council form has been submitted"))
+                        if (EmailFrom.ToLower().Contains("noreply@northamptonshire.gov.uk") && message.Subject.ToLower().Contains("northamptonshire council form has been submitted"))
                         {
                             contactUs = true;
                             useSigParser = false;
                         }
-                        if (emailFrom.ToLower().Contains("fixmystreet.com"))
+                        if (EmailFrom.ToLower().Contains("fixmystreet.com"))
                         {
                             fixMyStreet = true;
                             useSigParser = false;
@@ -149,18 +150,18 @@ namespace Email2CXM.Helpers
                     catch (Exception)
                     {
                     }
-                    subject = message.Subject;
+                    Subject = message.Subject;
 
-                    if (String.IsNullOrWhiteSpace(subject))
+                    if (String.IsNullOrWhiteSpace(Subject))
                     {
-                        subject = " ";
+                        Subject = " ";
                     }
                     List<String> names = message.From[0].Name.Split(' ').ToList();
                     firstName = names.First();
                     names.RemoveAt(0);
                     lastName = String.Join(" ", names.ToArray());
                     emailBody = message.HtmlBody;
-                    Console.WriteLine(emailFrom + " - Email Contents : " + message.TextBody);
+                    Console.WriteLine(EmailFrom + " - Email Contents : " + message.TextBody);
                     if (String.IsNullOrEmpty(message.TextBody))
                     {
                         if (String.IsNullOrEmpty(message.HtmlBody))
@@ -192,6 +193,7 @@ namespace Email2CXM.Helpers
                     {
                         if (liveInstance)
                         {
+                            MyCouncilEndPoint = secrets.MyCouncilLiveEndPoint;
                             if (west)
                             {
                                 cxmEndPoint = secrets.cxmEndPointLive;
@@ -216,6 +218,7 @@ namespace Email2CXM.Helpers
                         }
                         else
                         {
+                            MyCouncilEndPoint = secrets.MyCouncilTestEndPoint;
                             if (west)
                             {
                                 cxmEndPoint = secrets.cxmEndPointTest;
@@ -303,13 +306,13 @@ namespace Email2CXM.Helpers
                         if (useSigParser)
                         {
                             SigParser.Client sigParserClient = new SigParser.Client(secrets.sigParseKey);
-                            SigParser.EmailParseRequest sigParserRequest = new SigParser.EmailParseRequest { plainbody = emailContents, from_name = firstName + " " + lastName, from_address = emailFrom };
+                            SigParser.EmailParseRequest sigParserRequest = new SigParser.EmailParseRequest { plainbody = emailContents, from_name = firstName + " " + lastName, from_address = EmailFrom };
                             parsedEmailUnencoded = sigParserClient.Parse(sigParserRequest).cleanedemailbody_plain;
                             if ((parsedEmailUnencoded == null || parsedEmailUnencoded.Contains("___")) && !bundlerFound)
                             {
                                 Console.WriteLine($"No message found, checking for forwarded message");
                                 parsedEmailUnencoded = sigParserClient.Parse(sigParserRequest).emails[1].cleanedBodyPlain;
-                                emailFrom = sigParserClient.Parse(sigParserRequest).emails[1].from_EmailAddress;
+                                EmailFrom = sigParserClient.Parse(sigParserRequest).emails[1].from_EmailAddress;
                                 names = sigParserClient.Parse(sigParserRequest).emails[1].from_Name.Split(' ').ToList();
                                 firstName = names.First();
                                 names.RemoveAt(0);
@@ -333,7 +336,7 @@ namespace Email2CXM.Helpers
                             {
                                 int emailAddressStarts = emailContents.ToLower().IndexOf("email address:") + 15;
                                 int emailAddressEnds = emailContents.ToLower().IndexOf("telephone number:");
-                                emailFrom = emailContents.Substring(emailAddressStarts, emailAddressEnds - emailAddressStarts).TrimEnd('\r', '\n');
+                                EmailFrom = emailContents.Substring(emailAddressStarts, emailAddressEnds - emailAddressStarts).TrimEnd('\r', '\n');
                             }
                             catch { }
                             try
@@ -415,17 +418,16 @@ namespace Email2CXM.Helpers
                             String lng = FMSDeserializeLng(emailContents);
                             String northing = FMSDeserializeNorthing(emailContents);
                             String easting = FMSDeserializeEasting(emailContents);
-                            //type
-                            emailFrom = FMSDeserializeEmail(emailContents);
+                            EmailFrom = FMSDeserializeEmail(emailContents);
                             telNo = FMSDeserializePhone(emailContents);
                             String road = FMSDeserializeStreet(emailContents);
                             String postcode = FMSDeserializePostcode(emailContents);
-                            String temp = await GetUSRN(lat, lng);
-                            String type = await GetStringFieldFromDynamoAsync(FMSDeserializeCategory(message.HtmlBody), "MyCouncilCategory", "FixMyStreetCategory");
-                            Boolean myCouncilCaseCreated = await CreateMyCouncilCase(type,lat,lng,description,road,"nearest street",emailFrom,telNo,firstName + " " + lastName);
+                            String usrn = await GetUSRN(lat, lng);
+                            String type = await GetStringFieldFromDynamoAsync(FMSDeserializeCategory(message.HtmlBody).ToLower(), "Classification", "FixMyStreetNorthampton");
+                            Boolean myCouncilCaseCreated = await CreateMyCouncilCase(type, lat, lng, description, road, usrn, EmailFrom, telNo, firstName + " " + lastName);
+   
                             //TODO Transition to with-digital if no type match
                             //TODO transition to with-digital if no usrn
-                            //CreateMyCouncilCase(String problemType, String problemLat, String problemLng, String problemDescription, String problemLocation, String problemStreet, String problemEmail, String problemText, String problemName)
                         }
                     }
                     catch (Exception error)
@@ -441,7 +443,7 @@ namespace Email2CXM.Helpers
                         try
                         {
                             HttpResponseMessage responseMessage = await client.GetAsync(
-                            cxmEndPoint + "/api/service-api/norbert/user/" + emailFrom + "?key=" + cxmAPIKey);
+                            cxmEndPoint + "/api/service-api/norbert/user/" + EmailFrom + "?key=" + cxmAPIKey);
                             responseMessage.EnsureSuccessStatusCode();
                             String responseBody = await responseMessage.Content.ReadAsStringAsync();
                             dynamic jsonResponse = JObject.Parse(responseBody);
@@ -471,22 +473,22 @@ namespace Email2CXM.Helpers
                     }
 
 
-                    if (emailFrom.Contains(secrets.loopPreventIdentifier) || (emailTo.ToLower().Contains("update") && (emailFrom.ToLower().Contains("westnorthants.gov.uk") || emailFrom.ToLower().Contains("northnorthants.gov.uk"))))
+                    if (EmailFrom.Contains(secrets.loopPreventIdentifier) || (EmailTo.ToLower().Contains("update") && (EmailFrom.ToLower().Contains("westnorthants.gov.uk") || EmailFrom.ToLower().Contains("northnorthants.gov.uk"))))
                     {
-                        Console.WriteLine(emailFrom + " - Loop identifier found - no case created or updated : " + keyName);
+                        Console.WriteLine(EmailFrom + " - Loop identifier found - no case created or updated : " + keyName);
                     }
                     else
                     {
-                        if (subject.Contains("EMA") || parsedEmailUnencoded.Contains("EMA") || subject.Contains("EMN") || parsedEmailUnencoded.Contains("EMN"))
+                        if (Subject.Contains("EMA") || parsedEmailUnencoded.Contains("EMA") || Subject.Contains("EMN") || parsedEmailUnencoded.Contains("EMN"))
                         {
                             HttpClient client = new HttpClient();
                             String caseNumber = "";
                             if (west)
                             {
-                                if (subject.Contains("EMA"))
+                                if (Subject.Contains("EMA"))
                                 {
-                                    int refLocation = subject.IndexOf("EMA");
-                                    caseNumber = subject.Substring(refLocation, 9);
+                                    int refLocation = Subject.IndexOf("EMA");
+                                    caseNumber = Subject.Substring(refLocation, 9);
                                 }
                                 else
                                 {
@@ -496,10 +498,10 @@ namespace Email2CXM.Helpers
                             }
                             else
                             {
-                                if (subject.Contains("EMN"))
+                                if (Subject.Contains("EMN"))
                                 {
-                                    int refLocation = subject.IndexOf("EMN");
-                                    caseNumber = subject.Substring(refLocation, 9);
+                                    int refLocation = Subject.IndexOf("EMN");
+                                    caseNumber = Subject.Substring(refLocation, 9);
                                 }
                                 else
                                 {
@@ -512,7 +514,7 @@ namespace Email2CXM.Helpers
 
                             if (await IsAutoResponse(parsedEmailUnencoded))
                             {
-                                Console.WriteLine(caseReference + " : " + emailFrom + " - Autoresponder Text Found : " + keyName);
+                                Console.WriteLine(caseReference + " : " + EmailFrom + " - Autoresponder Text Found : " + keyName);
                             }
                             else
                             {
@@ -598,8 +600,8 @@ namespace Email2CXM.Helpers
                                     {
                                         { "first-name", firstName },
                                         { "surname", lastName },
-                                        { "email", emailFrom },
-                                        { "subject", subject },
+                                        { "email", EmailFrom },
+                                        { "subject", Subject },
                                         { "enquiry-details", await TrimEmailContents(parsedEmailUnencoded)},
                                         { "customer-has-updated", false },
                                         { "unitary", unitary },
@@ -623,8 +625,8 @@ namespace Email2CXM.Helpers
                                     {
                                         { "first-name", firstName },
                                         { "surname", lastName },
-                                        { "email", emailFrom },
-                                        { "subject", subject },
+                                        { "email", EmailFrom },
+                                        { "subject", Subject },
                                         { "enquiry-details", await TrimEmailContents(parsedEmailUnencoded) },
                                         { "customer-has-updated", false },
                                         { "unitary", unitary },
@@ -791,6 +793,21 @@ namespace Email2CXM.Helpers
                     {
                         if (((String)crmJSONobject.SelectToken("result")).Equals("success"))
                         {
+                            caseReference = ((String)crmJSONobject.SelectToken("callNumber"));
+                            if (String.IsNullOrEmpty(problemType))
+                            {
+                                UpdateCaseString("email-comments", "Unexpected FixMyStreet classification of '" + FMSDeserializeCategory(message.HtmlBody) + "' found.");
+                                await TransitionCaseAsync("with-digital");
+                            }
+                            if (String.IsNullOrEmpty(problemStreet))
+                            {
+                                await TransitionCaseAsync("with-digital");
+                            }
+                            if (problemType.ToLower().Equals("unknown"))
+                            {
+                                UpdateCaseString("case-update-details", "No mapping of FixMyStreet classification of '" + FMSDeserializeCategory(message.HtmlBody) + "' found.");
+                                await TransitionCaseAsync("with-digital");
+                            }
                             return true;
                         }
                         else
@@ -851,7 +868,7 @@ namespace Email2CXM.Helpers
                     AttributesToGet = new List<String> { field },
                     ConsistentRead = true
                 };
-                Document document = await table.GetItemAsync(key.ToLower(), config);
+                Document document = await table.GetItemAsync(key, config);
                 return document[field].AsPrimitive().Value.ToString();
             }
             catch (Exception error)
@@ -979,7 +996,7 @@ namespace Email2CXM.Helpers
             }
             catch (Exception error)
             {
-                Console.WriteLine(emailFrom + " - ERROR Email Contents from Base64: " + error.ToString());
+                Console.WriteLine(EmailFrom + " - ERROR Email Contents from Base64: " + error.ToString());
             }
 
             return content;
@@ -1006,6 +1023,50 @@ namespace Email2CXM.Helpers
                 Console.WriteLine("ERROR : GetSecretValue : " + error.StackTrace);
                 return false;
             }
+        }
+
+        private Boolean UpdateCaseString(String fieldName, String fieldValue)
+        {
+            String data = "{\"" + fieldName + "\":\"" + fieldValue.ToLower() + "\"" +
+                "}";
+
+            if (UpdateCase(data))
+            {
+                return true;
+            }
+            else
+            {
+                Console.WriteLine(caseReference + " : Error updating CXM field " + fieldName + " with message : " + fieldValue);
+                return false;
+            }
+        }
+
+        private Boolean UpdateCase(String data)
+        {
+            Console.WriteLine($"PATCH payload : " + data);
+
+            String url = cxmEndPoint + "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "/edit?key=" + cxmAPIKey;
+            Encoding encoding = Encoding.Default;
+            HttpWebRequest patchRequest = (HttpWebRequest)WebRequest.Create(url);
+            patchRequest.Method = "PATCH";
+            patchRequest.ContentType = "application/json; charset=utf-8";
+            byte[] buffer = encoding.GetBytes(data);
+            Stream dataStream = patchRequest.GetRequestStream();
+            dataStream.Write(buffer, 0, buffer.Length);
+            dataStream.Close();
+            try
+            {
+                HttpWebResponse patchResponse = (HttpWebResponse)patchRequest.GetResponse();
+                String result = "";
+                using StreamReader reader = new StreamReader(patchResponse.GetResponseStream(), Encoding.Default);
+                result = reader.ReadToEnd();
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine(caseReference + " : " + error.ToString());
+                return false;
+            }
+            return true; ;
         }
 
         private async Task<Boolean> TransitionCaseAsync(String transitionTo)
@@ -1298,5 +1359,7 @@ namespace Email2CXM.Helpers
         public String NNCContactUsMappingTable { get; set; }
         public String AutoResponseTableLive { get; set; }
         public String AutoResponseTableTest { get; set; }
+        public String MyCouncilTestEndPoint { get; set; }
+        public String MyCouncilLiveEndPoint { get; set; }
     }
 }
