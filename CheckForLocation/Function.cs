@@ -238,22 +238,22 @@ namespace CheckForLocation
             {
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("northampton")) 
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northampton" + "\">Redirect to Northampton</a><BR>";
-                }
-
-                if (!caseDetails.sovereignCouncil.ToLower().Equals("south_northants"))
-                {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "south_northants" + "\">Redirect to South Northants</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northampton" + "\">Redirect to Guildhall Hub</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("daventry"))
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "daventry" + "\">Redirect to Daventry</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "daventry" + "\">Redirect to Lodge Road Hub</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("northamptonshire"))
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northamptonshire" + "\">Redirect to County</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northamptonshire" + "\">Redirect to One Angel Square Hub</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("south_northants"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "south_northants" + "\">Redirect to The Forum Hub</a><BR>";
                 }
             }
             else
