@@ -1208,6 +1208,10 @@ namespace Email2CXM.Helpers
             try
             {
                 int fieldStarts = Email.IndexOf("Phone") + 5;
+                if (fieldStarts == 4)
+                {
+                    return "";
+                }
                 int fieldEnds = Email.IndexOf("Replies to this", fieldStarts);
                 return Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
             }

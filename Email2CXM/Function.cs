@@ -54,10 +54,10 @@ namespace Email2CXM
             {
                 //Test Code
                 //bucket = "nnc.incoming.emails.test";
-                bucket = "norbert.emails.updates.test";
+                bucket = "norbert.emails.test";
                 //bucket = "nnc.emails.test";
                 //file = "megan3.eml";
-                file = "nvr9djpibf0dqrmetk99cedpl95gn373lhivbio1";
+                file = "ProblemReportDogMess.eml";
             }
  
 
