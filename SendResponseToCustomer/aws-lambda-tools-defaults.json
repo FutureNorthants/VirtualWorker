@@ -6,7 +6,7 @@
         "dotnet lambda help",
         "All the command line options for the Lambda command can be specified in this file."
     ],
-    "profile"     : "default",
+    "profile"     : "NNC Prod",
     "region"      : "eu-west-2",
     "configuration" : "Release",
     "framework"     : "netcoreapp3.1",
@@ -15,9 +15,9 @@
     "function-timeout"     : 30,
     "function-handler"     : "SendResponseToCustomer::SendResponseToCustomer.Function::FunctionHandler",
     "function-name"        : "SendResponseToCustomer",
-    "function-description" : "Respond to customer within CXM",
+    "function-description" : "Send email back to customer",
     "package-type"         : "Zip",
-    "function-role"        : "arn:aws:iam::898823515462:role/lambdaMyCouncil",
+    "function-role"        : "arn:aws:iam::418943896884:role/nncLambda",
     "tracing-mode"         : "PassThrough",
     "environment-variables" : "",
     "image-tag"             : ""
