@@ -37,7 +37,7 @@ namespace SendResponseToCustomer
         private static string cxmEndPoint;
         private static string cxmAPIKey;
         private static string CXMAPIName;
-        private static string dynamoTable = "MailBotCasesTest";
+        private static string dynamoTable;
         private static string sqsEmailURL;
         private static string templateBucket;
         private Boolean liveInstance = false;
@@ -79,7 +79,6 @@ namespace SendResponseToCustomer
                 {
                     if (context.InvokedFunctionArn.ToLower().Contains("prod"))
                     {
-                        dynamoTable = "MailBotCasesLive";
                         liveInstance = true;
                     }
                 }
@@ -95,12 +94,14 @@ namespace SendResponseToCustomer
                         cxmEndPoint = secrets.cxmEndPointLive;
                         cxmAPIKey = secrets.cxmAPIKeyLive;
                         CXMAPIName = secrets.cxmAPINameWest;
+                        dynamoTable = secrets.wncEMACasesLive;
                     }
                     else
                     {
                         cxmEndPoint = secrets.cxmEndPointLiveNorth;
                         cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
                         CXMAPIName = secrets.cxmAPINameNorth;
+                        dynamoTable = secrets.nncEMNCasesLive;
                     }
                     sqsEmailURL = secrets.SqsEmailURLLive;
                     CaseDetails caseDetailsLive = await GetCaseDetailsAsync();
@@ -115,12 +116,14 @@ namespace SendResponseToCustomer
                         cxmEndPoint = secrets.cxmEndPointTest;
                         cxmAPIKey = secrets.cxmAPIKeyTest;
                         CXMAPIName = secrets.cxmAPINameWest;
+                        dynamoTable = secrets.wncEMACasesTest;
                     }
                     else
                     {
                         cxmEndPoint = secrets.cxmEndPointTestNorth;
                         cxmAPIKey = secrets.cxmAPIKeyTestNorth;
                         CXMAPIName = secrets.cxmAPINameNorth;
+                        dynamoTable = secrets.nncEMNCasesTest;
                     }
                     
                     sqsEmailURL = secrets.SqsEmailURLTest;
@@ -178,6 +181,7 @@ namespace SendResponseToCustomer
                     caseDetails.serviceArea = (String)caseSearch.SelectToken("values.service_area_4");
                     caseDetails.sentiment = (String)caseSearch.SelectToken("values.sentiment");
                     caseDetails.recommendationAccuracy = (String)caseSearch.SelectToken("values.recommendation_accuracy");
+                    caseDetails.EnquiryDetails = (String)caseSearch.SelectToken("values.enquiry_details");
                     if (!west)
                     {
                         caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
@@ -483,6 +487,7 @@ namespace SendResponseToCustomer
         public String serviceArea { get; set; } = "";
         public String sentiment { get; set; } = "";
         public String recommendationAccuracy { get; set; } = "";
+        public string EnquiryDetails { get; set; } = "";
     }
 
     public class Secrets
@@ -502,5 +507,9 @@ namespace SendResponseToCustomer
         public string organisationName { get; set; }
         public string templateBucketLive { get; set; }
         public string templateBucketTest { get; set; }
+        public string wncEMACasesLive { get; set; }
+        public string wncEMACasesTest { get; set; }
+        public string nncEMNCasesLive { get; set; }
+        public string nncEMNCasesTest { get; set; }
     }
 }
