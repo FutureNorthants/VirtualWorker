@@ -69,6 +69,8 @@ namespace Email2CXM.Helpers
 
         private MimeMessage message = null;
 
+        MyCouncilCase myCouncilCase = null;
+
         public ProcessMessage()
         {
             client = new AmazonS3Client(bucketRegion);
@@ -216,7 +218,7 @@ namespace Email2CXM.Helpers
                             }
 
                         }
-                        else
+                        else  
                         {
                             MyCouncilEndPoint = secrets.MyCouncilTestEndPoint;
                             if (west)
@@ -419,13 +421,15 @@ namespace Email2CXM.Helpers
                             String northing = FMSDeserializeNorthing(emailContents);
                             String easting = FMSDeserializeEasting(emailContents);
                             EmailFrom = FMSDeserializeEmail(emailContents);
+                            //TODO Temp Code!!!!
+                            //EmailFrom = "kevin.white@clubpit.com";
                             telNo = FMSDeserializePhone(emailContents);
                             String road = FMSDeserializeStreet(emailContents);
                             String postcode = FMSDeserializePostcode(emailContents);
+                            String details = FMSDeserializeDetails(message.HtmlBody);
                             String usrn = await GetUSRN(lat, lng);
                             String type = await GetStringFieldFromDynamoAsync(FMSDeserializeCategory(message.HtmlBody).ToLower(), "Classification", "FixMyStreetNorthampton");
-                            Boolean myCouncilCaseCreated = await CreateMyCouncilCase(type, lat, lng, description, road, usrn, EmailFrom, telNo, firstName + " " + lastName);
-   
+                            myCouncilCase = await CreateMyCouncilCase(type, lat, lng, description + " - " + details, road, usrn, EmailFrom, telNo, firstName + " " + lastName); 
                             //TODO Transition to with-digital if no type match
                             //TODO transition to with-digital if no usrn
                         }
@@ -593,6 +597,19 @@ namespace Email2CXM.Helpers
                                 {
                                     telNoField = "customer-telephone-number";
                                 }
+                                String comments = "";
+                                if (fixMyStreet)
+                                {
+                                    if (myCouncilCase.Success)
+                                    {
+                                        comments = "Report It case raised : " + myCouncilCase.CaseReference;
+                                    }
+                                    else
+                                    {
+                                        comments = "Unable to raise Report It case : " + "???";
+                                    }
+                                }
+                                   
 
                                 if (contactUs)
                                 {
@@ -613,7 +630,7 @@ namespace Email2CXM.Helpers
                                         { "sovereign-service-area", cxmSovereignServiceArea },
                                         { "original-email", await TrimEmailContents(parsedEmailUnencoded) }
                                     };
-                                    success = await CreateCXMCase(values, parsedEmailUnencoded, message, person, bundlerFound);
+                                    success = await CreateCXMCase(values, parsedEmailUnencoded, message, person, comments, bundlerFound);
                                     if (!success)
                                     {
                                         Console.WriteLine("ERROR - Retrying case without cxmSovereignServiceArea of : " + cxmSovereignServiceArea);
@@ -637,7 +654,7 @@ namespace Email2CXM.Helpers
                                         { "email-id", keyName},
                                         { "original-email", await TrimEmailContents(message.TextBody) }
                                     };
-                                    await CreateCXMCase(values, parsedEmailUnencoded, message, person, bundlerFound);
+                                    await CreateCXMCase(values, parsedEmailUnencoded, message, person, comments, bundlerFound);
                                 }
 
                                 responseFileName = "email-no-faq.txt";
@@ -647,6 +664,12 @@ namespace Email2CXM.Helpers
                                 if (bundlerFound)
                                 {
                                     await TransitionCaseAsync("awaiting-bundling");
+                                }
+
+                                if (fixMyStreet&&myCouncilCase.Success)
+                                {
+                                    UpdateCaseString("case-update-details", "Case created as a result of : " + caseReference,myCouncilCase.CaseReference);
+                                    await TransitionCaseAsync("close-case");
                                 }
                             }
 
@@ -695,7 +718,7 @@ namespace Email2CXM.Helpers
             return true;
         }
 
-        private async Task<Boolean> CreateCXMCase(Dictionary<String, Object> values, String parsedEmailUnencoded, MimeMessage message, String person, Boolean bundlerFound)
+        private async Task<Boolean> CreateCXMCase(Dictionary<String, Object> values, String parsedEmailUnencoded, MimeMessage message, String person, String comments, Boolean bundlerFound)
         {
             try
             {
@@ -703,6 +726,10 @@ namespace Email2CXM.Helpers
                 if (!person.Equals(""))
                 {
                     values.Add("person", person);
+                }
+                if (!String.IsNullOrEmpty(comments))
+                {
+                    values.Add("email-comments", comments);
                 }
                 if (bundlerFound)
                 {
@@ -739,8 +766,9 @@ namespace Email2CXM.Helpers
             return true;
         }
 
-        private async Task<Boolean> CreateMyCouncilCase(String problemType, String problemLat, String problemLng, String problemDescription, String problemLocation, String problemStreet, String problemEmail, String problemText, String problemName)
+        private async Task<MyCouncilCase> CreateMyCouncilCase(String problemType, String problemLat, String problemLng, String problemDescription, String problemLocation, String problemStreet, String problemEmail, String problemText, String problemName)
         {
+            MyCouncilCase mycouncilCase = new MyCouncilCase();
             HttpClient client = new HttpClient();
 
             client.DefaultRequestHeaders.Add("Accept", "application/json");
@@ -784,7 +812,7 @@ namespace Email2CXM.Helpers
                 {
                     int errorIndex = jsonResult.IndexOf("HTTP Status ", StringComparison.Ordinal);
                     Console.WriteLine("ERROR - MyCouncil Case Not Created : " + jsonResult.Substring(errorIndex + 12, 3));
-                    return false;
+                    return mycouncilCase;
                 }
                 else
                 {
@@ -793,10 +821,11 @@ namespace Email2CXM.Helpers
                     {
                         if (((String)crmJSONobject.SelectToken("result")).Equals("success"))
                         {
-                            caseReference = ((String)crmJSONobject.SelectToken("callNumber"));
+                            //caseReference = ((String)crmJSONobject.SelectToken("callNumber"));
+                            mycouncilCase.CaseReference = ((String)crmJSONobject.SelectToken("callNumber"));
                             if (String.IsNullOrEmpty(problemType))
                             {
-                                UpdateCaseString("email-comments", "Unexpected FixMyStreet classification of '" + FMSDeserializeCategory(message.HtmlBody) + "' found.");
+                                UpdateCaseString("email-comments", "Unexpected FixMyStreet classification of '" + FMSDeserializeCategory(message.HtmlBody) + "' found.", caseReference);
                                 await TransitionCaseAsync("with-digital");
                             }
                             if (String.IsNullOrEmpty(problemStreet))
@@ -805,22 +834,23 @@ namespace Email2CXM.Helpers
                             }
                             if (problemType.ToLower().Equals("unknown"))
                             {
-                                UpdateCaseString("case-update-details", "No mapping of FixMyStreet classification of '" + FMSDeserializeCategory(message.HtmlBody) + "' found.");
+                                UpdateCaseString("case-update-details", "No mapping of FixMyStreet classification of '" + FMSDeserializeCategory(message.HtmlBody) + "' found.", caseReference);
                                 await TransitionCaseAsync("with-digital");
                             }
-                            return true;
+                            mycouncilCase.Success = true;
+                            return mycouncilCase;
                         }
                         else
                         {
                             Console.WriteLine("ERROR : Unexpected response from MyCouncil :" + ((String)crmJSONobject.SelectToken("result")));
-                            return false;
+                            return mycouncilCase;
                         }
                     }
                     catch (Exception error)
                     {
                         Console.WriteLine("ERROR : Parsing MyCouncil JSON Response :" + error.Message);
                         Console.WriteLine("ERROR : " + error.StackTrace);
-                        return false;
+                        return mycouncilCase;
                     }
                 } 
             }
@@ -828,7 +858,7 @@ namespace Email2CXM.Helpers
             {
                 Console.WriteLine("ERROR : Sending case to MyCouncil :" + error.Message);
                 Console.WriteLine("ERROR : " + error.StackTrace);
-                return false;
+                return mycouncilCase;
             }
         }
 
@@ -1025,12 +1055,12 @@ namespace Email2CXM.Helpers
             }
         }
 
-        private Boolean UpdateCaseString(String fieldName, String fieldValue)
+        private Boolean UpdateCaseString(String fieldName, String fieldValue, String caseReference)
         {
-            String data = "{\"" + fieldName + "\":\"" + fieldValue.ToLower() + "\"" +
+            String data = "{\"" + fieldName + "\":\"" + fieldValue + "\"" +
                 "}";
 
-            if (UpdateCase(data))
+            if (UpdateCase(data, caseReference))
             {
                 return true;
             }
@@ -1041,7 +1071,7 @@ namespace Email2CXM.Helpers
             }
         }
 
-        private Boolean UpdateCase(String data)
+        private Boolean UpdateCase(String data, String caseReference)
         {
             Console.WriteLine($"PATCH payload : " + data);
 
@@ -1328,6 +1358,36 @@ namespace Email2CXM.Helpers
                 return "";
             }
         }
+
+        private String FMSDeserializeDetails(String Email)
+        {
+            try
+            {
+                int fieldStarts = Email.IndexOf("font-size: 14px; line-height: 20px; margin: 0 0 0.8em 0;") + 80;
+                fieldStarts = Email.IndexOf("font-size: 14px; line-height: 20px; margin: 0 0 0.8em 0;",fieldStarts) + 58;
+                int fieldEnds = Email.IndexOf("</p>", fieldStarts);
+                return Email.Substring(fieldStarts, fieldEnds - fieldStarts).TrimEnd('\r', '\n');
+            }
+            catch
+            {
+                Console.WriteLine("WARNING : Unable to deserialize FMS Category");
+                return "";
+            }
+        }
+    }
+
+    public class MyCouncilCase
+    {
+        public Boolean Success { get; set; }
+        public String CaseReference { get; set; }
+
+        public MyCouncilCase()
+        {
+            Success = false;
+            CaseReference = "";
+        }
+
+        
     }
 
     public class Secrets
