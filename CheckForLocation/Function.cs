@@ -573,6 +573,8 @@ namespace CheckForLocation
                             }
                             else
                             {
+                                //TODO Drops here if out of area postcode - need to send confirmation #75
+
                                 Console.WriteLine(caseReference + " : North Transition");
                                 await TransitionCaseAsync("hub-awaiting-review");
                             }
