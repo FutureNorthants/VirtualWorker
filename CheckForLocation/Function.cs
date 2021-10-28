@@ -451,17 +451,35 @@ namespace CheckForLocation
                 }
                 else if (caseDetails.manualReview)
                 {
-                    Boolean replyToCustomer = true;
-                    if (!String.IsNullOrEmpty(caseDetails.forward))
+                    if (caseDetails.Redirected)
                     {
-                        String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
-                        success = await SendEmails(caseDetails, forwardingEmailAddress, replyToCustomer);
-                        replyToCustomer = false;
+                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, caseDetails.sovereignServiceArea);
+                        if (String.IsNullOrEmpty(forwardingEmailAddress))
+                        {
+                            forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
+                            defaultRouting = true;
+                        }
+                        success = await SendEmails(caseDetails, forwardingEmailAddress, true);
+                        if (success)
+                        {
+                            caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
+                            await TransitionCaseAsync("close-case");
+                        }
                     }
-                    if (!String.IsNullOrEmpty(caseDetails.nncForwardEMailTo))
+                    else
                     {
-                        success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer);
-                    }
+                        Boolean replyToCustomer = true;
+                        if (!String.IsNullOrEmpty(caseDetails.forward))
+                        {
+                            String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
+                            success = await SendEmails(caseDetails, forwardingEmailAddress, replyToCustomer);
+                            replyToCustomer = false;
+                        }
+                        if (!String.IsNullOrEmpty(caseDetails.nncForwardEMailTo))
+                        {
+                            success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer);
+                        }
+                    }  
                     if (success)
                     {
                         await TransitionCaseAsync("close-case");
