@@ -71,6 +71,8 @@ namespace CheckForLocation
 
         private Location sovereignLocation;
 
+        MemoryStream memoryStream = new MemoryStream();
+
         public async Task FunctionHandler(object input, ILambdaContext context)
         {
             if (await GetSecrets())
@@ -1471,7 +1473,7 @@ namespace CheckForLocation
         private async Task<MimeMessage> GetMessageAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
         {
             //
-            toAddress = "kevin.white@clubpit.com";
+            //toAddress = "kevin.white@clubpit.com";
             //includeOriginalEmail = false;
             //
             MimeMessage message = new MimeMessage();
@@ -1564,7 +1566,7 @@ namespace CheckForLocation
                     AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
                     GetObjectResponse image = await s3.GetObjectAsync(emailBucket, emailID);
                     byte[] imageBytes = new byte[image.ContentLength];
-                    using (MemoryStream memoryStream = new MemoryStream())
+                    //using (MemoryStream memoryStream = new MemoryStream())
                     {
                         int read;
                         byte[] buffer = new byte[16 * 1024];
@@ -1573,7 +1575,7 @@ namespace CheckForLocation
                             memoryStream.Write(buffer, 0, read);
                         }
                         imageBytes = memoryStream.ToArray();
-                        attachment = new MimePart("application", "octet-stream")
+                        attachment = new MimePart("message", "rfc822")
                         {
                             Content = new MimeContent(memoryStream, ContentEncoding.Default),
                             ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
