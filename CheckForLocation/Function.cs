@@ -1470,15 +1470,21 @@ namespace CheckForLocation
 
         private async Task<MimeMessage> GetMessageAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
         {
+            //
+            toAddress = "kevin.white@clubpit.com";
+            //includeOriginalEmail = false;
+            //
             MimeMessage message = new MimeMessage();
             message.From.Add(new MailboxAddress(from, fromAddress));
             message.To.Add(new MailboxAddress(string.Empty, toAddress));
             message.Bcc.Add(new MailboxAddress(string.Empty, bccAddress));
             message.Subject = subject;
+
             try
             {
-                BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
-                message.Body = bodyBuilder.ToMessageBody();
+                //BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
+                //message.Body = bodyBuilder.ToMessageBody();
+                message = await GetMessageBodyAsync2(message, emailID, htmlBody, textBody, includeOriginalEmail);
                 return message;
             }
             catch (ApplicationException error)
@@ -1532,6 +1538,69 @@ namespace CheckForLocation
             }
             return body;
 
+        }
+
+        private async Task<MimeMessage> GetMessageBodyAsync2(MimeMessage message, String emailID, String htmlBody, String textBody, Boolean includeOriginalEmail)
+        {
+            byte[] textBodyBytes = Encoding.UTF8.GetBytes("Test");
+            byte[] htmlBodyBytes = Encoding.UTF8.GetBytes(htmlBody);
+            TextPart plain = new TextPart();
+            TextPart html = new TextPart("html");
+            MimePart attachment=null;
+            plain.ContentTransferEncoding = ContentEncoding.Base64;
+            html.ContentTransferEncoding = ContentEncoding.Base64;
+            plain.SetText(Encoding.UTF8, Encoding.Default.GetString(textBodyBytes));
+            html.SetText(Encoding.UTF8, Encoding.Default.GetString(htmlBodyBytes));
+            MultipartAlternative alternative = new MultipartAlternative();
+            alternative.Add(plain);
+            alternative.Add(html);
+            Multipart multipart = new Multipart("mixed");
+            multipart.Add(alternative);
+
+            if (includeOriginalEmail)
+            {
+                try
+                {
+                    AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
+                    GetObjectResponse image = await s3.GetObjectAsync(emailBucket, emailID);
+                    byte[] imageBytes = new byte[image.ContentLength];
+                    using (MemoryStream memoryStream = new MemoryStream())
+                    {
+                        int read;
+                        byte[] buffer = new byte[16 * 1024];
+                        while ((read = image.ResponseStream.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            memoryStream.Write(buffer, 0, read);
+                        }
+                        imageBytes = memoryStream.ToArray();
+                        attachment = new MimePart("application", "octet-stream")
+                        {
+                            Content = new MimeContent(memoryStream, ContentEncoding.Default),
+                            ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                            ContentTransferEncoding = ContentEncoding.Base64,
+                            FileName = caseReference + ".eml"
+                        };
+                        multipart.Add(attachment);
+                    }
+                }
+                catch (Exception error)
+                {
+                    UpdateCaseString("email-comments", Messages.missingEmailFile);
+                    if (west)
+                    {
+                        await TransitionCaseAsync("unitary-awaiting-review");
+                    }
+                    else
+                    {
+                        await TransitionCaseAsync("hub-awaiting-review");
+                    }
+                    Console.WriteLine(caseReference + " : Error Attaching original email : " + error.Message);
+                    throw new ApplicationException("Error Attaching original email");
+                }
+
+            }  
+            message.Body = multipart;
+            return message;
         }
 
         private static String RemoveSuppressionList(String suppressionlist, String content)
