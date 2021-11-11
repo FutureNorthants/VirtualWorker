@@ -58,6 +58,7 @@ namespace CheckForLocation
         private static String norbertSendFrom;
         private static String emailBucket;
         private static String bccEmailAddress;
+        private static String persona;
 
         private Boolean liveInstance = false;
         private Boolean district = true;
@@ -93,6 +94,17 @@ namespace CheckForLocation
                 JObject inputJSON = JObject.Parse(input.ToString());
                 caseReference = (String)inputJSON.SelectToken("CaseReference");
                 taskToken = (String)inputJSON.SelectToken("TaskToken");
+
+                Random randonNumber = new Random();
+                if (randonNumber.Next(0, 2) == 0)
+                {
+                    persona = secrets.botPersona1;
+                }
+                else
+                {
+                    persona = secrets.botPersona2;
+                }
+
                 try
                 {
                     if (((String)inputJSON.SelectToken("FromStatus")).ToString().ToLower().Equals("case-closed"))
@@ -222,7 +234,7 @@ namespace CheckForLocation
                 {
                     //await SendFailureAsync(caseReference + " : ApplicationException : " + error.Message, "ProcessCaseAsync");
                     await SendSuccessAsync();
-                }     
+                }
             }
 
             Console.WriteLine("Completed");
@@ -238,51 +250,51 @@ namespace CheckForLocation
             }
             if (west)
             {
-                if (!caseDetails.sovereignCouncil.ToLower().Equals("northampton")) 
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("northampton"))
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northampton" + "\">Redirect to Guildhall Hub</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northampton" + "&persona=" + persona + "\">Redirect to Guildhall Hub</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("daventry"))
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "daventry" + "\">Redirect to Lodge Road Hub</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "daventry" + "&persona=" + persona + "\">Redirect to Lodge Road Hub</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("northamptonshire"))
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northamptonshire" + "\">Redirect to One Angel Square Hub</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northamptonshire" + "&persona=" + persona + "\">Redirect to One Angel Square Hub</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("south_northants"))
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "south_northants" + "\">Redirect to The Forum Hub</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "south_northants" + "&persona=" + persona + "\">Redirect to The Forum Hub</a><BR>";
                 }
             }
             else
             {
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("wellingborough"))
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "wellingborough" + "\">Redirect to Wellingborough</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "wellingborough" + "&persona=" + persona + "\">Redirect to Wellingborough</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("corby"))
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "corby" + "\">Redirect to Corby</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "corby" + "&persona=" + persona + "\">Redirect to Corby</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("east_northants"))
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "east_northants" + "\">Redirect to East Northants</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "east_northants" + "&persona=" + persona + "\">Redirect to East Northants</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("kettering"))
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "kettering" + "\">Redirect to Kettering</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "kettering" + "&persona=" + persona + "\">Redirect to Kettering</a><BR>";
                 }
 
                 if (!caseDetails.sovereignCouncil.ToLower().Equals("northamptonshire"))
                 {
-                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northamptonshire" + "\">Redirect to County</a><BR>";
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northamptonshire" + "&persona=" + persona + "\">Redirect to County</a><BR>";
                 }
             }
             return links;
@@ -424,7 +436,7 @@ namespace CheckForLocation
                     return false;
                 }
 
-                if (reopened&&!caseDetails.Redirected)
+                if (reopened && !caseDetails.Redirected)
                 {
                     return await UpdateClosedCaseAsync();
                 }
@@ -481,11 +493,11 @@ namespace CheckForLocation
                         {
                             success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer);
                         }
-                    }  
+                    }
                     if (success)
                     {
                         await TransitionCaseAsync("close-case");
-                    }                  
+                    }
                 }
                 else
                 {
@@ -677,15 +689,7 @@ namespace CheckForLocation
                 emailBody = emailBody.Replace("AAA", caseReference);
                 emailBody = emailBody.Replace("ZZZ", caseDetails.enquiryDetails);
                 emailBody = emailBody.Replace("GGG", caseDetails.customerName);
-                Random rand = new Random();
-                if (rand.Next(0, 2) == 0)
-                {
-                    emailBody = emailBody.Replace("NNN", secrets.botPersona1);
-                }
-                else
-                {
-                    emailBody = emailBody.Replace("NNN", secrets.botPersona2);
-                }
+                emailBody = emailBody.Replace("NNN", persona);
 
                 if (String.IsNullOrEmpty(caseDetails.fullEmail))
                 {
@@ -1298,11 +1302,11 @@ namespace CheckForLocation
                 Console.WriteLine(caseReference + " : SendEmails Ended");
                 return true;
             }
-            catch(ApplicationException error)
+            catch (ApplicationException error)
             {
                 throw new ApplicationException(error.Message);
             }
- 
+
         }
 
         private async Task<Boolean> SendToTrello(String caseReference, String fieldLabel, String techLabel)
@@ -1451,7 +1455,7 @@ namespace CheckForLocation
                     Console.WriteLine(caseReference + " : Error Sending Raw Email : " + error.Message);
                     return false;
                 }
-  
+
             }
         }
 
@@ -1464,18 +1468,14 @@ namespace CheckForLocation
                 message.WriteTo(stream);
                 return stream;
             }
-            catch(ApplicationException error)
+            catch (ApplicationException error)
             {
                 throw new ApplicationException(error.Message);
-            }        
+            }
         }
 
         private async Task<MimeMessage> GetMessageAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
         {
-            //
-            //toAddress = "kevin.white@clubpit.com";
-            //includeOriginalEmail = false;
-            //
             MimeMessage message = new MimeMessage();
             message.From.Add(new MailboxAddress(from, fromAddress));
             message.To.Add(new MailboxAddress(string.Empty, toAddress));
@@ -1522,21 +1522,21 @@ namespace CheckForLocation
                         body.Attachments.Add(caseReference + ".eml", imageBytes);
                     }
                 }
-                catch(Exception error)
+                catch (Exception error)
                 {
                     UpdateCaseString("email-comments", Messages.missingEmailFile);
                     if (west)
                     {
-                       await TransitionCaseAsync("unitary-awaiting-review");
+                        await TransitionCaseAsync("unitary-awaiting-review");
                     }
                     else
-                    { 
-                       await TransitionCaseAsync("hub-awaiting-review");
+                    {
+                        await TransitionCaseAsync("hub-awaiting-review");
                     }
                     Console.WriteLine(caseReference + " : Error Attaching original email : " + error.Message);
                     throw new ApplicationException("Error Attaching original email");
                 }
- 
+
             }
             return body;
 
@@ -1548,7 +1548,7 @@ namespace CheckForLocation
             byte[] htmlBodyBytes = Encoding.UTF8.GetBytes(htmlBody);
             TextPart plain = new TextPart();
             TextPart html = new TextPart("html");
-            MimePart attachment=null;
+            MimePart attachment = null;
             plain.ContentTransferEncoding = ContentEncoding.Base64;
             html.ContentTransferEncoding = ContentEncoding.Base64;
             plain.SetText(Encoding.UTF8, Encoding.Default.GetString(textBodyBytes));
@@ -1566,24 +1566,21 @@ namespace CheckForLocation
                     AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
                     GetObjectResponse image = await s3.GetObjectAsync(emailBucket, emailID);
                     byte[] imageBytes = new byte[image.ContentLength];
-                    //using (MemoryStream memoryStream = new MemoryStream())
+                    int read;
+                    byte[] buffer = new byte[16 * 1024];
+                    while ((read = image.ResponseStream.Read(buffer, 0, buffer.Length)) > 0)
                     {
-                        int read;
-                        byte[] buffer = new byte[16 * 1024];
-                        while ((read = image.ResponseStream.Read(buffer, 0, buffer.Length)) > 0)
-                        {
-                            memoryStream.Write(buffer, 0, read);
-                        }
-                        imageBytes = memoryStream.ToArray();
-                        attachment = new MimePart("message", "rfc822")
-                        {
-                            Content = new MimeContent(memoryStream, ContentEncoding.Default),
-                            ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
-                            ContentTransferEncoding = ContentEncoding.Base64,
-                            FileName = caseReference + ".eml"
-                        };
-                        multipart.Add(attachment);
+                        memoryStream.Write(buffer, 0, read);
                     }
+                    imageBytes = memoryStream.ToArray();
+                    attachment = new MimePart("message", "rfc822")
+                    {
+                        Content = new MimeContent(memoryStream, ContentEncoding.Default),
+                        ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                        ContentTransferEncoding = ContentEncoding.Base64,
+                        FileName = caseReference + ".eml"
+                    };
+                    multipart.Add(attachment);
                 }
                 catch (Exception error)
                 {
@@ -1600,7 +1597,7 @@ namespace CheckForLocation
                     throw new ApplicationException("Error Attaching original email");
                 }
 
-            }  
+            }
             message.Body = multipart;
             return message;
         }
