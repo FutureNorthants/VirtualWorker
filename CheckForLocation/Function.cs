@@ -575,20 +575,17 @@ namespace CheckForLocation
                                 }
                                 outOfArea = true;
                             }
-                            success = await SendEmails(caseDetails, forwardingEmailAddress, true);
-                            if (success)
+                            if (west && sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton") && defaultRouting)
                             {
-                                if (west && sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton") && defaultRouting)
-                                {
-                                    UpdateCaseBoolean("unitary", false);
-                                    UpdateCaseString("email-comments", "Transitioning case to local process");
-                                    await TransitionCaseAsync("awaiting-review");
-                                }
-                                else
-                                {
-                                    UpdateCaseString("email-comments", "Closing case");
-                                    await TransitionCaseAsync("close-case");
-                                }
+                                UpdateCaseBoolean("unitary", false);
+                                UpdateCaseString("email-comments", "Transitioning case to local process");
+                                await TransitionCaseAsync("awaiting-review");
+                            }
+                            else
+                            {
+                                success = await SendEmails(caseDetails, forwardingEmailAddress, true);
+                                UpdateCaseString("email-comments", "Closing case");
+                                await TransitionCaseAsync("close-case");
                             }
                         }
                     }
