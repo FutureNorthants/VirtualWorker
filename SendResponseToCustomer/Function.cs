@@ -27,7 +27,7 @@ namespace SendResponseToCustomer
     public class Function
     {
         private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
-        private static RegionEndpoint bucketRegion = RegionEndpoint.EUWest1;
+        private static RegionEndpoint bucketRegion = RegionEndpoint.EUWest2;
         private static RegionEndpoint sqsRegion = RegionEndpoint.EUWest1;
         private static readonly String secretName = "nbcGlobal";
         private static readonly String secretAlias = "AWSCURRENT";
@@ -88,13 +88,13 @@ namespace SendResponseToCustomer
 
                 if (liveInstance)
                 {
-                    templateBucket = secrets.templateBucketLive;
                     if (west)
                     {
                         cxmEndPoint = secrets.cxmEndPointLive;
                         cxmAPIKey = secrets.cxmAPIKeyLive;
                         CXMAPIName = secrets.cxmAPINameWest;
                         dynamoTable = secrets.wncEMACasesLive;
+                        templateBucket = secrets.templateBucketLive;
                     }
                     else
                     {
@@ -102,6 +102,7 @@ namespace SendResponseToCustomer
                         cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
                         CXMAPIName = secrets.cxmAPINameNorth;
                         dynamoTable = secrets.nncEMNCasesLive;
+                        templateBucket = secrets.nncTemplateBucketLive;
                     }
                     sqsEmailURL = secrets.SqsEmailURLLive;
                     CaseDetails caseDetailsLive = await GetCaseDetailsAsync();
@@ -117,6 +118,7 @@ namespace SendResponseToCustomer
                         cxmAPIKey = secrets.cxmAPIKeyTest;
                         CXMAPIName = secrets.cxmAPINameWest;
                         dynamoTable = secrets.wncEMACasesTest;
+                        templateBucket = secrets.templateBucketTest;
                     }
                     else
                     {
@@ -124,6 +126,7 @@ namespace SendResponseToCustomer
                         cxmAPIKey = secrets.cxmAPIKeyTestNorth;
                         CXMAPIName = secrets.cxmAPINameNorth;
                         dynamoTable = secrets.nncEMNCasesTest;
+                        templateBucket = secrets.nncTemplateBucketTest;
                     }
                     
                     sqsEmailURL = secrets.SqsEmailURLTest;
@@ -511,5 +514,7 @@ namespace SendResponseToCustomer
         public string wncEMACasesTest { get; set; }
         public string nncEMNCasesLive { get; set; }
         public string nncEMNCasesTest { get; set; }
+        public string nncTemplateBucketLive { get; set; }
+        public string nncTemplateBucketTest { get; set; }
     }
 }
