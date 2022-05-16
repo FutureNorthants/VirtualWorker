@@ -580,7 +580,14 @@ namespace Email2CXM.Helpers
                                     }
                                     try
                                     {
-                                        cxmSovereignServiceArea = cxmSovereignServiceArea.Substring(cxmSovereignServiceArea.IndexOf("_") + 1);
+                                        if(cxmSovereignServiceArea.Equals("district_waste"))
+                                        {
+                                            cxmSovereignServiceArea = cxmSovereignServiceArea.Replace("_", "");
+;                                        }
+                                        else
+                                        {
+                                            cxmSovereignServiceArea = cxmSovereignServiceArea.Substring(cxmSovereignServiceArea.IndexOf("_") + 1);
+                                        }                                      
                                     }
                                     catch (Exception) { }
                                 }
