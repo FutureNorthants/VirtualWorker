@@ -29,6 +29,12 @@ using System.Web;
 
 namespace CheckForLocation
 {
+    public class Messages
+    {
+        public const String missingEmailFile = "This enquiry is more than 30 days old and has been archived. Please copy the original message and updates and forward onto the Sovereign Council via Outlook, quoting the email reference number";
+    }
+
+
     public class Function
     {
         private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
@@ -52,6 +58,7 @@ namespace CheckForLocation
         private static String norbertSendFrom;
         private static String emailBucket;
         private static String bccEmailAddress;
+        private static String persona;
 
         private Boolean liveInstance = false;
         private Boolean district = true;
@@ -59,11 +66,13 @@ namespace CheckForLocation
         private Boolean preventOutOfArea = true;
         private Boolean defaultRouting = false;
         private Boolean outOfArea = false;
-        private Boolean customerReopened = false;
+        private Boolean reopened = false;
 
         private Secrets secrets = null;
 
         private Location sovereignLocation;
+
+        MemoryStream memoryStream = new MemoryStream();
 
         public async Task FunctionHandler(object input, ILambdaContext context)
         {
@@ -75,6 +84,7 @@ namespace CheckForLocation
                 preventOutOfArea = true;
                 defaultRouting = false;
                 outOfArea = false;
+                reopened = false;
 
                 templateBucket = secrets.templateBucketTest;
                 postCodeURL = secrets.postcodeURLTest;
@@ -84,11 +94,22 @@ namespace CheckForLocation
                 JObject inputJSON = JObject.Parse(input.ToString());
                 caseReference = (String)inputJSON.SelectToken("CaseReference");
                 taskToken = (String)inputJSON.SelectToken("TaskToken");
+
+                Random randonNumber = new Random();
+                if (randonNumber.Next(0, 2) == 0)
+                {
+                    persona = secrets.botPersona1;
+                }
+                else
+                {
+                    persona = secrets.botPersona2;
+                }
+
                 try
                 {
                     if (((String)inputJSON.SelectToken("FromStatus")).ToString().ToLower().Equals("case-closed"))
                     {
-                        customerReopened = true;
+                        reopened = true;
                     }
                 }
                 catch (Exception) { }
@@ -204,11 +225,79 @@ namespace CheckForLocation
                 }
                 Console.WriteLine(caseReference + " : Prevent Out of Area : " + preventOutOfArea);
                 CaseDetails caseDetails = await GetCaseDetailsAsync();
-                await ProcessCaseAsync(caseDetails);
-                await SendSuccessAsync();
+                try
+                {
+                    await ProcessCaseAsync(caseDetails);
+                    await SendSuccessAsync();
+                }
+                catch (ApplicationException error)
+                {
+                    //await SendFailureAsync(caseReference + " : ApplicationException : " + error.Message, "ProcessCaseAsync");
+                    await SendSuccessAsync();
+                }
             }
 
             Console.WriteLine("Completed");
+        }
+
+        private String FormatLinks(CaseDetails caseDetails)
+        {
+            String links = "";
+            String instanceText = "test";
+            if (liveInstance)
+            {
+                instanceText = "prod";
+            }
+            if (west)
+            {
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("northampton"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northampton" + "&persona=" + persona + "\">Redirect to Guildhall Hub</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("daventry"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "daventry" + "&persona=" + persona + "\">Redirect to Lodge Road Hub</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("northamptonshire"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northamptonshire" + "&persona=" + persona + "\">Redirect to One Angel Square Hub</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("south_northants"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "south_northants" + "&persona=" + persona + "\">Redirect to The Forum Hub</a><BR>";
+                }
+            }
+            else
+            {
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("wellingborough"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "wellingborough" + "&persona=" + persona + "\">Redirect to Wellingborough</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("corby"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "corby" + "&persona=" + persona + "\">Redirect to Corby</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("east_northants"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "east_northants" + "&persona=" + persona + "\">Redirect to East Northants</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("kettering"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "kettering" + "&persona=" + persona + "\">Redirect to Kettering</a><BR>";
+                }
+
+                if (!caseDetails.sovereignCouncil.ToLower().Equals("northamptonshire"))
+                {
+                    links += "<a href=\"" + secrets.RedirectURI + "?instance=" + instanceText + "&reference=" + caseReference + "&transfercaseto=" + "northamptonshire" + "&persona=" + persona + "\">Redirect to County</a><BR>";
+                }
+            }
+            return links;
         }
 
         private async Task<Boolean> GetSecrets()
@@ -299,10 +388,12 @@ namespace CheckForLocation
                     caseDetails.customerHasUpdated = (Boolean)caseSearch.SelectToken("values.customer_has_updated");
                     caseDetails.sovereignCouncil = GetStringValueFromJSON(caseSearch, "values.sovereign_council");
                     caseDetails.sovereignServiceArea = GetStringValueFromJSON(caseSearch, "values.sovereign_service_area");
+                    caseDetails.Redirected = GetBooleanValueFromJSON(caseSearch, "values.redirected");
                     caseDetails.fullEmail = RemoveSuppressionList(secrets.SuppressWording, GetStringValueFromJSON(caseSearch, "values.original_email"));
                     if (caseReference.ToLower().Contains("emn"))
                     {
                         caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
+                        caseDetails.telephoneNumber = (String)caseSearch.SelectToken("values.customer_telephone_number");
                         caseDetails.nncForwardEMailTo = GetStringValueFromJSON(caseSearch, "values.forward_email_to");
                         caseDetails.contactUs = (Boolean)caseSearch.SelectToken("values.emn_contact_us");
                         try
@@ -345,7 +436,7 @@ namespace CheckForLocation
                     return false;
                 }
 
-                if (customerReopened)
+                if (reopened && !caseDetails.Redirected)
                 {
                     return await UpdateClosedCaseAsync();
                 }
@@ -359,30 +450,54 @@ namespace CheckForLocation
                         defaultRouting = true;
                     }
                     success = await SendEmails(caseDetails, forwardingEmailAddress, true);
-                    caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
-                    if (caseDetails.sovereignCouncil.ToLower().Equals("northampton") && defaultRouting)
+                    if (success)
                     {
-                        await TransitionCaseAsync("awaiting-review");
-                    }
-                    else
-                    {
-                        await TransitionCaseAsync("close-case");
+                        caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
+                        if (caseDetails.sovereignCouncil.ToLower().Equals("northampton") && defaultRouting)
+                        {
+                            await TransitionCaseAsync("awaiting-review");
+                        }
+                        else
+                        {
+                            await TransitionCaseAsync("close-case");
+                        }
                     }
                 }
                 else if (caseDetails.manualReview)
                 {
-                    Boolean replyToCustomer = true;
-                    if (!String.IsNullOrEmpty(caseDetails.forward))
+                    if (caseDetails.Redirected)
                     {
-                        String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
-                        success = await SendEmails(caseDetails, forwardingEmailAddress, replyToCustomer);
-                        replyToCustomer = false;
+                        String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, caseDetails.sovereignServiceArea);
+                        if (String.IsNullOrEmpty(forwardingEmailAddress))
+                        {
+                            forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
+                            defaultRouting = true;
+                        }
+                        success = await SendEmails(caseDetails, forwardingEmailAddress, true);
+                        if (success)
+                        {
+                            caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
+                            await TransitionCaseAsync("close-case");
+                        }
                     }
-                    if (!String.IsNullOrEmpty(caseDetails.nncForwardEMailTo))
+                    else
                     {
-                        success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer);
+                        Boolean replyToCustomer = true;
+                        if (!String.IsNullOrEmpty(caseDetails.forward))
+                        {
+                            String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
+                            success = await SendEmails(caseDetails, forwardingEmailAddress, replyToCustomer);
+                            replyToCustomer = false;
+                        }
+                        if (!String.IsNullOrEmpty(caseDetails.nncForwardEMailTo))
+                        {
+                            success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer);
+                        }
                     }
-                    await TransitionCaseAsync("close-case");
+                    if (success)
+                    {
+                        await TransitionCaseAsync("close-case");
+                    }
                 }
                 else
                 {
@@ -460,7 +575,6 @@ namespace CheckForLocation
                                 }
                                 outOfArea = true;
                             }
-                            success = await SendEmails(caseDetails, forwardingEmailAddress, true);
                             if (west && sovereignLocation.SovereignCouncilName.ToLower().Equals("northampton") && defaultRouting)
                             {
                                 UpdateCaseBoolean("unitary", false);
@@ -469,6 +583,7 @@ namespace CheckForLocation
                             }
                             else
                             {
+                                success = await SendEmails(caseDetails, forwardingEmailAddress, true);
                                 UpdateCaseString("email-comments", "Closing case");
                                 await TransitionCaseAsync("close-case");
                             }
@@ -487,6 +602,8 @@ namespace CheckForLocation
                             }
                             else
                             {
+                                //TODO Drops here if out of area postcode - need to send confirmation #75
+
                                 Console.WriteLine(caseReference + " : North Transition");
                                 await TransitionCaseAsync("hub-awaiting-review");
                             }
@@ -515,8 +632,10 @@ namespace CheckForLocation
                         }
                     }
                 }
-
-
+            }
+            catch (ApplicationException error)
+            {
+                throw new ApplicationException(error.Message);
             }
             catch (Exception)
             {
@@ -567,6 +686,7 @@ namespace CheckForLocation
                 emailBody = emailBody.Replace("AAA", caseReference);
                 emailBody = emailBody.Replace("ZZZ", caseDetails.enquiryDetails);
                 emailBody = emailBody.Replace("GGG", caseDetails.customerName);
+                emailBody = emailBody.Replace("NNN", persona);
 
                 if (String.IsNullOrEmpty(caseDetails.fullEmail))
                 {
@@ -613,6 +733,7 @@ namespace CheckForLocation
                 {
                     emailBody = emailBody.Replace("KKK", caseDetails.customerEmail);
                 }
+                emailBody = emailBody.Replace("YYY", FormatLinks(caseDetails));
             }
             catch (Exception error)
             {
@@ -1055,6 +1176,17 @@ namespace CheckForLocation
             }
         }
 
+        private Boolean GetBooleanValueFromJSON(JObject json, String fieldName)
+        {
+            Boolean returnValue = false;
+            try
+            {
+                returnValue = (Boolean)json.SelectToken(fieldName);
+            }
+            catch (Exception) { }
+            return returnValue;
+        }
+
         private String GetStringValueFromJSON(JObject json, String fieldName)
         {
             String returnValue = "";
@@ -1064,105 +1196,114 @@ namespace CheckForLocation
             }
             catch (Exception) { }
             return returnValue;
+
         }
 
         private async Task<Boolean> SendEmails(CaseDetails caseDetails, String forwardingEmailAddress, Boolean replyToCustomer)
         {
-            Console.WriteLine(caseReference + " : SendEmails Started");
-            String emailBody = "";
-            if (replyToCustomer && !caseDetails.ConfirmationSent)
+            try
             {
-                Console.WriteLine(caseReference + " : Sending confirmation email");
-                String subject = "";
-                if (outOfArea)
+                Console.WriteLine(caseReference + " : SendEmails Started");
+                String emailBody = "";
+                if (replyToCustomer && !caseDetails.ConfirmationSent)
                 {
-                    emailBody = await FormatEmailAsync(caseDetails, "sovereign-misdirect-acknowledge.txt");
-                    subject = orgName + " : We have redirected your enquiry";
-                }
-                else
-                {
-                    emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
-                    subject = orgName + " : Your Call Number is " + caseReference;
-                }
+                    Console.WriteLine(caseReference + " : Sending confirmation email");
+                    String subject = "";
+                    if (outOfArea)
+                    {
+                        emailBody = await FormatEmailAsync(caseDetails, "sovereign-misdirect-acknowledge.txt");
+                        subject = orgName + " : We have redirected your enquiry";
+                    }
+                    else
+                    {
+                        emailBody = await FormatEmailAsync(caseDetails, "email-sovereign-acknowledge.txt");
+                        subject = orgName + " : Your Call Number is " + caseReference;
+                    }
 
-                if (!String.IsNullOrEmpty(emailBody))
-                {
-                    if (!await SendEmailAsync(secrets.OrganisationNameShort, norbertSendFrom, caseDetails.customerEmail, bccEmailAddress, subject, caseDetails.emailID, emailBody, "", false))
+                    if (!String.IsNullOrEmpty(emailBody))
+                    {
+                        if (!await SendEmailAsync(secrets.OrganisationNameShort, norbertSendFrom, caseDetails.customerEmail, bccEmailAddress, subject, caseDetails.emailID, emailBody, "", false))
+                        {
+                            Console.WriteLine(caseReference + " : ERROR : Failed to send confirmation email");
+                            UpdateCaseString("email-comments", "Failed to send confirmation email to " + caseDetails.customerEmail);
+                            return false;
+                        }
+                        Console.WriteLine(caseReference + " : Sent confirmation email");
+                        UpdateCaseString("email-comments", "Confirmation email sent to " + caseDetails.customerEmail);
+                    }
+                    else
                     {
                         Console.WriteLine(caseReference + " : ERROR : Failed to send confirmation email");
                         UpdateCaseString("email-comments", "Failed to send confirmation email to " + caseDetails.customerEmail);
+                        await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
                         return false;
                     }
-                    Console.WriteLine(caseReference + " : Sent confirmation email");
-                    UpdateCaseString("email-comments", "Confirmation email sent to " + caseDetails.customerEmail);
-                }
-                else
-                {
-                    Console.WriteLine(caseReference + " : ERROR : Failed to send confirmation email");
-                    UpdateCaseString("email-comments", "Failed to send confirmation email to " + caseDetails.customerEmail);
-                    await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
-                    return false;
-                }
-                if (UpdateCaseBoolean("confirmation-sent", true)) { }
-                else
-                {
-                    Console.WriteLine(caseReference + " : ERROR : Failed to update confirmation-sent");
-                    UpdateCaseString("email-comments", "Failed to update confirmation-sent");
-                }
-            }
-
-            Console.WriteLine(caseReference + " : Sending forward email");
-
-            if (west && caseDetails.sovereignCouncil.ToLower().Equals("northampton") && defaultRouting)
-            {
-                Console.WriteLine(caseReference + " : Local default case no forward necessary");
-            }
-            else
-            {
-                Console.WriteLine(caseReference + " : Preparing to forward email");
-                String forwardFileName = "";
-                if (caseDetails.contactUs)
-                {
-                    Console.WriteLine(caseReference + " : ContactUs case");
-                    forwardFileName = "email-sovereign-forward-contactus.txt";
-                }
-                else
-                {
-                    Console.WriteLine(caseReference + " : Email case");
-                    forwardFileName = "email-sovereign-forward.txt";
-                }
-                emailBody = await FormatEmailAsync(caseDetails, forwardFileName);
-                Console.WriteLine(caseReference + " : Email contents set");
-                if (!String.IsNullOrEmpty(emailBody))
-                {
-                    String subjectPrefix = "";
-                    if (!liveInstance)
+                    if (UpdateCaseBoolean("confirmation-sent", true)) { }
+                    else
                     {
-                        if (!String.IsNullOrEmpty(caseDetails.forward))
+                        Console.WriteLine(caseReference + " : ERROR : Failed to update confirmation-sent");
+                        UpdateCaseString("email-comments", "Failed to update confirmation-sent");
+                    }
+                }
+
+                Console.WriteLine(caseReference + " : Sending forward email");
+
+                if (west && caseDetails.sovereignCouncil.ToLower().Equals("northampton") && defaultRouting)
+                {
+                    Console.WriteLine(caseReference + " : Local default case no forward necessary");
+                }
+                else
+                {
+                    Console.WriteLine(caseReference + " : Preparing to forward email");
+                    String forwardFileName = "";
+                    if (caseDetails.contactUs)
+                    {
+                        Console.WriteLine(caseReference + " : ContactUs case");
+                        forwardFileName = "email-sovereign-forward-contactus.txt";
+                    }
+                    else
+                    {
+                        Console.WriteLine(caseReference + " : Email case");
+                        forwardFileName = "email-sovereign-forward.txt";
+                    }
+                    emailBody = await FormatEmailAsync(caseDetails, forwardFileName);
+                    Console.WriteLine(caseReference + " : Email contents set");
+                    if (!String.IsNullOrEmpty(emailBody))
+                    {
+                        String subjectPrefix = "";
+                        if (!liveInstance)
                         {
-                            subjectPrefix = "(" + caseDetails.forward + ") ";
+                            if (!String.IsNullOrEmpty(caseDetails.forward))
+                            {
+                                subjectPrefix = "(" + caseDetails.forward + ") ";
+                            }
+                            subjectPrefix += "TEST - ";
                         }
-                        subjectPrefix += "TEST - ";
+                        if (!await SendEmailAsync(secrets.OrganisationNameShort, norbertSendFrom, forwardingEmailAddress.ToLower(), bccEmailAddress, subjectPrefix + "Hub case reference number is " + caseReference, caseDetails.emailID, emailBody, "", true))
+                        {
+                            Console.WriteLine(caseReference + " : ERROR : Failed to forward email");
+                            UpdateCaseString("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
+                            return false;
+                        }
+                        Console.WriteLine(caseReference + " : Forwarded email");
+                        UpdateCaseString("email-comments", "Forwarded email to " + forwardingEmailAddress.ToLower());
                     }
-                    if (!await SendEmailAsync(secrets.OrganisationNameShort, norbertSendFrom, forwardingEmailAddress.ToLower(), bccEmailAddress, subjectPrefix + "Hub case reference number is " + caseReference, caseDetails.emailID, emailBody, "", true))
+                    else
                     {
-                        Console.WriteLine(caseReference + " : ERROR : Failed to forward email");
+                        Console.WriteLine(caseReference + "ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
                         UpdateCaseString("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
+                        await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
                         return false;
                     }
-                    Console.WriteLine(caseReference + " : Forwarded email");
-                    UpdateCaseString("email-comments", "Forwarded email to " + forwardingEmailAddress.ToLower());
                 }
-                else
-                {
-                    Console.WriteLine(caseReference + "ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
-                    UpdateCaseString("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
-                    await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
-                    return false;
-                }
+                Console.WriteLine(caseReference + " : SendEmails Ended");
+                return true;
             }
-            Console.WriteLine(caseReference + " : SendEmails Ended");
-            return true;
+            catch (ApplicationException error)
+            {
+                throw new ApplicationException(error.Message);
+            }
+
         }
 
         private async Task<Boolean> SendToTrello(String caseReference, String fieldLabel, String techLabel)
@@ -1296,41 +1437,62 @@ namespace CheckForLocation
         {
             using (AmazonSimpleEmailServiceClient client = new AmazonSimpleEmailServiceClient(RegionEndpoint.EUWest1))
             {
-                SendRawEmailRequest sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, textBody, bccAddress, includeOriginalEmail)) };
                 try
                 {
+                    SendRawEmailRequest sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, textBody, bccAddress, includeOriginalEmail)) };
                     SendRawEmailResponse response = await client.SendRawEmailAsync(sendRequest);
                     return true;
+                }
+                catch (ApplicationException error)
+                {
+                    throw new ApplicationException(error.Message);
                 }
                 catch (Exception error)
                 {
                     Console.WriteLine(caseReference + " : Error Sending Raw Email : " + error.Message);
                     return false;
                 }
+
             }
         }
 
-        private static async Task<MemoryStream> GetMessageStreamAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
+        private async Task<MemoryStream> GetMessageStreamAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
         {
             MemoryStream stream = new MemoryStream();
-            MimeMessage message = await GetMessageAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, textBody, bccAddress, includeOriginalEmail);
-            message.WriteTo(stream);
-            return stream;
+            try
+            {
+                MimeMessage message = await GetMessageAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, textBody, bccAddress, includeOriginalEmail);
+                message.WriteTo(stream);
+                return stream;
+            }
+            catch (ApplicationException error)
+            {
+                throw new ApplicationException(error.Message);
+            }
         }
 
-        private static async Task<MimeMessage> GetMessageAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
+        private async Task<MimeMessage> GetMessageAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
         {
             MimeMessage message = new MimeMessage();
             message.From.Add(new MailboxAddress(from, fromAddress));
             message.To.Add(new MailboxAddress(string.Empty, toAddress));
             message.Bcc.Add(new MailboxAddress(string.Empty, bccAddress));
             message.Subject = subject;
-            BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
-            message.Body = bodyBuilder.ToMessageBody();
-            return message;
+
+            try
+            {
+                //BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
+                //message.Body = bodyBuilder.ToMessageBody();
+                message = await GetMessageBodyAsync2(message, emailID, htmlBody, textBody, includeOriginalEmail);
+                return message;
+            }
+            catch (ApplicationException error)
+            {
+                throw new ApplicationException(error.Message);
+            }
         }
 
-        private static async Task<BodyBuilder> GetMessageBodyAsync(String emailID, String htmlBody, String textBody, Boolean includeOriginalEmail)
+        private async Task<BodyBuilder> GetMessageBodyAsync(String emailID, String htmlBody, String textBody, Boolean includeOriginalEmail)
         {
             BodyBuilder body = new BodyBuilder()
             {
@@ -1340,30 +1502,101 @@ namespace CheckForLocation
 
             if (includeOriginalEmail)
             {
-                AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
-                GetObjectResponse image = await s3.GetObjectAsync(emailBucket, emailID);
-                byte[] imageBytes = new byte[image.ContentLength];
-                using (MemoryStream ms = new MemoryStream())
+                try
                 {
+                    AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
+                    GetObjectResponse image = await s3.GetObjectAsync(emailBucket, emailID);
+                    byte[] imageBytes = new byte[image.ContentLength];
+                    using (MemoryStream ms = new MemoryStream())
+                    {
+                        int read;
+                        byte[] buffer = new byte[16 * 1024];
+                        while ((read = image.ResponseStream.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            ms.Write(buffer, 0, read);
+                        }
+                        imageBytes = ms.ToArray();
+                        body.Attachments.Add(caseReference + ".eml", imageBytes);
+                    }
+                }
+                catch (Exception error)
+                {
+                    UpdateCaseString("email-comments", Messages.missingEmailFile);
+                    if (west)
+                    {
+                        await TransitionCaseAsync("unitary-awaiting-review");
+                    }
+                    else
+                    {
+                        await TransitionCaseAsync("hub-awaiting-review");
+                    }
+                    Console.WriteLine(caseReference + " : Error Attaching original email : " + error.Message);
+                    throw new ApplicationException("Error Attaching original email");
+                }
+
+            }
+            return body;
+
+        }
+
+        private async Task<MimeMessage> GetMessageBodyAsync2(MimeMessage message, String emailID, String htmlBody, String textBody, Boolean includeOriginalEmail)
+        {
+            byte[] textBodyBytes = Encoding.UTF8.GetBytes("Test");
+            byte[] htmlBodyBytes = Encoding.UTF8.GetBytes(htmlBody);
+            TextPart plain = new TextPart();
+            TextPart html = new TextPart("html");
+            MimePart attachment = null;
+            plain.ContentTransferEncoding = ContentEncoding.Base64;
+            html.ContentTransferEncoding = ContentEncoding.Base64;
+            plain.SetText(Encoding.UTF8, Encoding.Default.GetString(textBodyBytes));
+            html.SetText(Encoding.UTF8, Encoding.Default.GetString(htmlBodyBytes));
+            MultipartAlternative alternative = new MultipartAlternative();
+            alternative.Add(plain);
+            alternative.Add(html);
+            Multipart multipart = new Multipart("mixed");
+            multipart.Add(alternative);
+
+            if (includeOriginalEmail)
+            {
+                try
+                {
+                    AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
+                    GetObjectResponse image = await s3.GetObjectAsync(emailBucket, emailID);
+                    byte[] imageBytes = new byte[image.ContentLength];
                     int read;
                     byte[] buffer = new byte[16 * 1024];
                     while ((read = image.ResponseStream.Read(buffer, 0, buffer.Length)) > 0)
                     {
-                        ms.Write(buffer, 0, read);
+                        memoryStream.Write(buffer, 0, read);
                     }
-                    try
+                    imageBytes = memoryStream.ToArray();
+                    attachment = new MimePart("message", "rfc822")
                     {
-                        imageBytes = ms.ToArray();
-                        body.Attachments.Add(caseReference + ".eml", imageBytes);
-                    }
-                    catch (Exception error)
-                    {
-                        Console.WriteLine(caseReference + " : Error Attaching original email : " + error.Message);
-                    }
+                        Content = new MimeContent(memoryStream, ContentEncoding.Default),
+                        ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                        ContentTransferEncoding = ContentEncoding.Base64,
+                        FileName = caseReference + ".eml"
+                    };
+                    multipart.Add(attachment);
                 }
-            }
-            return body;
+                catch (Exception error)
+                {
+                    UpdateCaseString("email-comments", Messages.missingEmailFile);
+                    if (west)
+                    {
+                        await TransitionCaseAsync("unitary-awaiting-review");
+                    }
+                    else
+                    {
+                        await TransitionCaseAsync("hub-awaiting-review");
+                    }
+                    Console.WriteLine(caseReference + " : Error Attaching original email : " + error.Message);
+                    throw new ApplicationException("Error Attaching original email");
+                }
 
+            }
+            message.Body = multipart;
+            return message;
         }
 
         private static String RemoveSuppressionList(String suppressionlist, String content)
@@ -1416,6 +1649,7 @@ public class CaseDetails
     public Boolean contactUs { get; set; } = false;
     public Boolean District { get; set; } = false;
     public Boolean ConfirmationSent { get; set; } = false;
+    public Boolean Redirected { get; set; } = false;
 }
 
 public class Secrets
@@ -1466,6 +1700,9 @@ public class Secrets
     public String NncBccAddressLive { get; set; }
     public String SuppressWording { get; set; }
     public String OrganisationNameShort { get; set; }
+    public String botPersona1 { get; set; }
+    public String botPersona2 { get; set; }
+    public String RedirectURI { get; set; }
 }
 
 public class Location

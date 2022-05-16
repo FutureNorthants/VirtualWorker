@@ -286,8 +286,8 @@ namespace GetFAQResponse
             else
             {
                 //TODO secrets!
-                //if (minAutoRespondLevel < caseDetails.proposedResponseConfidence)
-                if (90 < caseDetails.proposedResponseConfidence)
+                if (minAutoRespondLevel < caseDetails.proposedResponseConfidence)
+                //if (90 < caseDetails.proposedResponseConfidence)
                 {
                     cxmPayload = new Dictionary<string, string>
                     {

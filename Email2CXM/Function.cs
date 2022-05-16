@@ -55,8 +55,8 @@ namespace Email2CXM
                 //Test Code
                 bucket = "nnc.incoming.emails.test";
                 //bucket = "norbert.emails.test";
-                //bucket = "nnc.emails.test";
-                file = "l9bot4j59quhc4jgpe67p0tnoojm2h6ghepi6781";
+                //file = "street clean.eml";
+                file = "j9v4pj9btb2kta4us578j05lhtnd54bv2aagaeo1";
             }
  
 

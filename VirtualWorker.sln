@@ -24,6 +24,9 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TransferCaseViaEmail", "TransferCaseViaEmail\TransferCaseViaEmail.csproj", "{6C51B210-CF46-4252-871F-1FB9F3B6446B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ChatBot", "ChatBot", "{BBA02F4B-F708-4E64-AA69-BEE7078EC803}"
+	ProjectSection(SolutionItems) = preProject
+		norbert.json = norbert.json
+	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebChat", "WebChat\WebChat.csproj", "{4ADCB937-EB2E-412E-AB1A-FA3E8383AA1F}"
 EndProject

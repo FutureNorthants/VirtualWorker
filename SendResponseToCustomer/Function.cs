@@ -27,22 +27,27 @@ namespace SendResponseToCustomer
     public class Function
     {
         private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
-        private static readonly RegionEndpoint bucketRegion = RegionEndpoint.EUWest1;
-        private static readonly RegionEndpoint sqsRegion = RegionEndpoint.EUWest1;
+        private static RegionEndpoint bucketRegion = RegionEndpoint.EUWest2;
+        private static RegionEndpoint sqsRegion = RegionEndpoint.EUWest1;
         private static readonly String secretName = "nbcGlobal";
         private static readonly String secretAlias = "AWSCURRENT";
 
-        private static String caseReference;
-        private static String taskToken;
-        private static String cxmEndPoint;
-        private static String cxmAPIKey;
-        private static String dynamoTable = "MailBotCasesTest";
+        private static string caseReference;
+        private static string taskToken;
+        private static string cxmEndPoint;
+        private static string cxmAPIKey;
+        private static string CXMAPIName;
+        private static string dynamoTable;
+        private static string sqsEmailURL;
+        private static string templateBucket;
         private Boolean liveInstance = false;
+        private Boolean west = true;
 
         private Secrets secrets = null;
 
         public async Task FunctionHandler(object input, ILambdaContext context)
         {
+            west = true;
             if (await GetSecrets())
             {
                 Boolean suppressResponse = false;
@@ -53,6 +58,14 @@ namespace SendResponseToCustomer
 
                 String fromStatus = (String)o.SelectToken("FromStatus");
                 String transition = (String)o.SelectToken("Transition");
+
+
+                if (caseReference.ToLower().Contains("emn"))
+                {
+                    west = false;
+                    bucketRegion = RegionEndpoint.EUWest2;
+                    sqsRegion = RegionEndpoint.EUWest2;
+                }
 
                 if (fromStatus.Equals(transition))
                 {
@@ -66,7 +79,6 @@ namespace SendResponseToCustomer
                 {
                     if (context.InvokedFunctionArn.ToLower().Contains("prod"))
                     {
-                        dynamoTable = "MailBotCasesLive";
                         liveInstance = true;
                     }
                 }
@@ -76,16 +88,48 @@ namespace SendResponseToCustomer
 
                 if (liveInstance)
                 {
-                    cxmEndPoint = secrets.cxmEndPointLive;
-                    cxmAPIKey = secrets.cxmAPIKeyLive;
+                    if (west)
+                    {
+                        cxmEndPoint = secrets.cxmEndPointLive;
+                        cxmAPIKey = secrets.cxmAPIKeyLive;
+                        CXMAPIName = secrets.cxmAPINameWest;
+                        dynamoTable = secrets.wncEMACasesLive;
+                        templateBucket = secrets.templateBucketLive;
+                    }
+                    else
+                    {
+                        cxmEndPoint = secrets.cxmEndPointLiveNorth;
+                        cxmAPIKey = secrets.cxmAPIKeyLiveNorth;
+                        CXMAPIName = secrets.cxmAPINameNorth;
+                        dynamoTable = secrets.nncEMNCasesLive;
+                        templateBucket = secrets.nncTemplateBucketLive;
+                    }
+                    sqsEmailURL = secrets.SqsEmailURLLive;
                     CaseDetails caseDetailsLive = await GetCaseDetailsAsync();
                     await ProcessCaseAsync(caseDetailsLive, suppressResponse);
                     await SendSuccessAsync();
                 }
                 else
                 {
-                    cxmEndPoint = secrets.cxmEndPointTest;
-                    cxmAPIKey = secrets.cxmAPIKeyTest;
+                    templateBucket = secrets.templateBucketLive;
+                    if (west)
+                    {
+                        cxmEndPoint = secrets.cxmEndPointTest;
+                        cxmAPIKey = secrets.cxmAPIKeyTest;
+                        CXMAPIName = secrets.cxmAPINameWest;
+                        dynamoTable = secrets.wncEMACasesTest;
+                        templateBucket = secrets.templateBucketTest;
+                    }
+                    else
+                    {
+                        cxmEndPoint = secrets.cxmEndPointTestNorth;
+                        cxmAPIKey = secrets.cxmAPIKeyTestNorth;
+                        CXMAPIName = secrets.cxmAPINameNorth;
+                        dynamoTable = secrets.nncEMNCasesTest;
+                        templateBucket = secrets.nncTemplateBucketTest;
+                    }
+                    
+                    sqsEmailURL = secrets.SqsEmailURLTest;
                     CaseDetails caseDetailsTest = await GetCaseDetailsAsync();
                     await ProcessCaseAsync(caseDetailsTest, suppressResponse);
                     await SendSuccessAsync();
@@ -123,7 +167,7 @@ namespace SendResponseToCustomer
             HttpClient cxmClient = new HttpClient();
             cxmClient.BaseAddress = new Uri(cxmEndPoint);
             string requestParameters = "key=" + cxmAPIKey;
-            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "/api/service-api/norbert/case/" + caseReference + "?" + requestParameters);
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "/api/service-api/" + CXMAPIName + "/case/" + caseReference + "?" + requestParameters);
             try
             {
                 HttpResponseMessage response = cxmClient.SendAsync(request).Result;
@@ -140,6 +184,11 @@ namespace SendResponseToCustomer
                     caseDetails.serviceArea = (String)caseSearch.SelectToken("values.service_area_4");
                     caseDetails.sentiment = (String)caseSearch.SelectToken("values.sentiment");
                     caseDetails.recommendationAccuracy = (String)caseSearch.SelectToken("values.recommendation_accuracy");
+                    caseDetails.EnquiryDetails = (String)caseSearch.SelectToken("values.enquiry_details");
+                    if (!west)
+                    {
+                        caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
+                    }
                 }
                 else
                 {
@@ -227,7 +276,7 @@ namespace SendResponseToCustomer
             HttpClient cxmClient = new HttpClient();
             cxmClient.BaseAddress = new Uri(cxmEndPoint);
             string requestParameters = "key=" + cxmAPIKey;
-            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "/api/service-api/norbert/case/" + caseReference + "/transition/" + transitionTo + "?" + requestParameters);
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "/api/service-api/" + CXMAPIName + "/case/" + caseReference + "/transition/" + transitionTo + "?" + requestParameters);
             HttpResponseMessage response = cxmClient.SendAsync(request).Result;
             if (response.IsSuccessStatusCode)
             {
@@ -249,7 +298,7 @@ namespace SendResponseToCustomer
             {
                 GetObjectRequest objectRequest = new GetObjectRequest
                 {
-                    BucketName = "norbert.templates",
+                    BucketName = templateBucket,
                     Key = "email-staff-response.txt"
                 };
                 using (GetObjectResponse objectResponse = await client.GetObjectAsync(objectRequest))
@@ -283,7 +332,7 @@ namespace SendResponseToCustomer
                     try
                     {
                         SendMessageRequest sendMessageRequest = new SendMessageRequest();
-                        sendMessageRequest.QueueUrl = secrets.sqsEmailURL;
+                        sendMessageRequest.QueueUrl = sqsEmailURL;
                         sendMessageRequest.MessageBody = emailBody;
                         Dictionary<string, MessageAttributeValue> MessageAttributes = new Dictionary<string, MessageAttributeValue>();
                         MessageAttributeValue messageTypeAttribute1 = new MessageAttributeValue();
@@ -296,7 +345,7 @@ namespace SendResponseToCustomer
                         MessageAttributes.Add("To", messageTypeAttribute2);
                         MessageAttributeValue messageTypeAttribute3 = new MessageAttributeValue();
                         messageTypeAttribute3.DataType = "String";
-                        messageTypeAttribute3.StringValue = "West Northants Council: Your Call Number is " + caseReference; ;
+                        messageTypeAttribute3.StringValue = secrets.organisationName + " : Your Call Number is " + caseReference; ;
                         MessageAttributes.Add("Subject", messageTypeAttribute3);
                         MessageAttributeValue messageTypeAttribute4 = new MessageAttributeValue();
                         messageTypeAttribute4.DataType = "String";
@@ -441,6 +490,7 @@ namespace SendResponseToCustomer
         public String serviceArea { get; set; } = "";
         public String sentiment { get; set; } = "";
         public String recommendationAccuracy { get; set; } = "";
+        public string EnquiryDetails { get; set; } = "";
     }
 
     public class Secrets
@@ -449,6 +499,22 @@ namespace SendResponseToCustomer
         public string cxmEndPointLive { get; set; }
         public string cxmAPIKeyTest { get; set; }
         public string cxmAPIKeyLive { get; set; }
-        public string sqsEmailURL { get; set; }
+        public string SqsEmailURLLive { get; set; }
+        public string SqsEmailURLTest { get; set; }
+        public string cxmEndPointTestNorth { get; set; }
+        public string cxmEndPointLiveNorth { get; set; }
+        public string cxmAPIKeyTestNorth { get; set; }
+        public string cxmAPIKeyLiveNorth { get; set; }
+        public string cxmAPINameNorth { get; set; }
+        public string cxmAPINameWest { get; set; }
+        public string organisationName { get; set; }
+        public string templateBucketLive { get; set; }
+        public string templateBucketTest { get; set; }
+        public string wncEMACasesLive { get; set; }
+        public string wncEMACasesTest { get; set; }
+        public string nncEMNCasesLive { get; set; }
+        public string nncEMNCasesTest { get; set; }
+        public string nncTemplateBucketLive { get; set; }
+        public string nncTemplateBucketTest { get; set; }
     }
 }
