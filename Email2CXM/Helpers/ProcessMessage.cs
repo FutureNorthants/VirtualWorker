@@ -573,23 +573,39 @@ namespace Email2CXM.Helpers
                                 String cxmSovereignServiceArea = "";
                                 if (contactUs)
                                 {
-                                    cxmSovereignServiceArea = await GetStringFieldFromDynamoAsync(serviceArea, "LexService", ContactUsTableMapping);
-                                    if (cxmSovereignServiceArea.ToLower().Contains("county"))
+                                    if (west)
                                     {
-                                        district = false;
-                                    }
-                                    try
-                                    {
-                                        if(cxmSovereignServiceArea.Equals("district_waste"))
+                                        cxmSovereignServiceArea = await GetStringFieldFromDynamoAsync(serviceArea, "LexService", ContactUsTableMapping);
+                                        if (cxmSovereignServiceArea.ToLower().Contains("county"))
                                         {
-                                            cxmSovereignServiceArea = cxmSovereignServiceArea.Replace("_", "");
-;                                        }
-                                        else
-                                        {
+                                            district = false;
+                                        }
+                                        try
+                                        {                                        
                                             cxmSovereignServiceArea = cxmSovereignServiceArea.Substring(cxmSovereignServiceArea.IndexOf("_") + 1);
-                                        }                                      
+                                        }
+                                        catch (Exception) { }
                                     }
-                                    catch (Exception) { }
+                                    else
+                                    {
+                                        cxmSovereignServiceArea = await GetStringFieldFromDynamoAsync(serviceArea, "LexService", ContactUsTableMapping);
+                                        if (cxmSovereignServiceArea.ToLower().Contains("county"))
+                                        {
+                                            district = false;
+                                        }
+                                        try
+                                        {
+                                            if (cxmSovereignServiceArea.Equals("district_waste"))
+                                            {
+                                                cxmSovereignServiceArea = cxmSovereignServiceArea.Replace("_", "");
+                                            }
+                                            else
+                                            {
+                                                cxmSovereignServiceArea = cxmSovereignServiceArea.Substring(cxmSovereignServiceArea.IndexOf("_") + 1);
+                                            }
+                                        }
+                                        catch (Exception) { }
+                                    }
                                 }
 
                                 Boolean success = true;
