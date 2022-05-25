@@ -67,6 +67,7 @@ namespace CheckForLocation
         private Boolean defaultRouting = false;
         private Boolean outOfArea = false;
         private Boolean reopened = false;
+        private Boolean OutOfArea = false;
 
         private Secrets secrets = null;
 
@@ -85,6 +86,7 @@ namespace CheckForLocation
                 defaultRouting = false;
                 outOfArea = false;
                 reopened = false;
+                outOfArea = false;
 
                 templateBucket = secrets.templateBucketTest;
                 postCodeURL = secrets.postcodeURLTest;
@@ -399,7 +401,7 @@ namespace CheckForLocation
                         try
                         {
                             caseDetails.forward = (String)caseSearch.SelectToken("values.emn_fwd_to_sovereign_council");
-                            if (!String.IsNullOrEmpty(caseDetails.forward))
+                            if (!caseDetails.Redirected&&!String.IsNullOrEmpty(caseDetails.forward))
                             {
                                 caseDetails.sovereignCouncil = caseDetails.forward;
                             }
@@ -551,12 +553,14 @@ namespace CheckForLocation
                         caseDetails.sovereignCouncil = sovereignLocation.SovereignCouncilName;
                         if (preventOutOfArea && west && !sovereignLocation.sovereignWest)
                         {
+                            outOfArea = true;
                             UpdateCaseString("email-comments", "Contact destination out of area");
                             await TransitionCaseAsync("unitary-awaiting-review");
                         }
                         else
                         if (preventOutOfArea && !west && sovereignLocation.sovereignWest)
                         {
+                            outOfArea = true;
                             UpdateCaseString("email-comments", "Contact destination out of area");
                             await TransitionCaseAsync("hub-awaiting-review");
                         }
@@ -733,7 +737,14 @@ namespace CheckForLocation
                 {
                     emailBody = emailBody.Replace("KKK", caseDetails.customerEmail);
                 }
-                emailBody = emailBody.Replace("YYY", FormatLinks(caseDetails));
+                if (outOfArea)
+                {
+                    emailBody = emailBody.Replace("YYY", "");
+                }
+                else
+                {
+                    emailBody = emailBody.Replace("YYY", FormatLinks(caseDetails));
+                }
             }
             catch (Exception error)
             {
@@ -1481,9 +1492,9 @@ namespace CheckForLocation
 
             try
             {
-                //BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
-                //message.Body = bodyBuilder.ToMessageBody();
-                message = await GetMessageBodyAsync2(message, emailID, htmlBody, textBody, includeOriginalEmail);
+                BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
+                message.Body = bodyBuilder.ToMessageBody();
+                //message = await GetMessageBodyAsync2(message, emailID, htmlBody, textBody, includeOriginalEmail);
                 return message;
             }
             catch (ApplicationException error)
