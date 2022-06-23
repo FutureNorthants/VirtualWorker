@@ -59,6 +59,7 @@ namespace CheckForLocation
         private static String emailBucket;
         private static String bccEmailAddress;
         private static String persona;
+        private static String SubjectServiceMinConfidence;
 
         private Boolean liveInstance = false;
         private Boolean district = true;
@@ -72,8 +73,7 @@ namespace CheckForLocation
         private Secrets secrets = null;
 
         private Location sovereignLocation;
-
-        MemoryStream memoryStream = new MemoryStream();
+        readonly MemoryStream memoryStream = new MemoryStream();
 
         public async Task FunctionHandler(object input, ILambdaContext context)
         {
@@ -133,6 +133,7 @@ namespace CheckForLocation
                     postCodeURL = secrets.postcodeURLLive;
                     lexAlias = "LIVE";
                     myAccountEndPoint = secrets.myAccountEndPointLive;
+                    SubjectServiceMinConfidence = secrets.SubjectServiceMinConfidenceLive;
                     if (caseReference.ToLower().Contains("ema"))
                     {
                         sovereignEmailTable = "MailBotCouncilsLive";
@@ -183,6 +184,7 @@ namespace CheckForLocation
                     postCodeURL = secrets.postcodeURLTest;
                     lexAlias = "UAT";
                     myAccountEndPoint = secrets.myAccountEndPointTest;
+                    SubjectServiceMinConfidence = secrets.SubjectServiceMinConfidenceTest;
                     if (caseReference.ToLower().Contains("ema"))
                     {
                         sovereignEmailTable = "MailBotCouncilsTest";
@@ -232,7 +234,7 @@ namespace CheckForLocation
                     await ProcessCaseAsync(caseDetails);
                     await SendSuccessAsync();
                 }
-                catch (ApplicationException error)
+                catch (ApplicationException)
                 {
                     //await SendFailureAsync(caseReference + " : ApplicationException : " + error.Message, "ProcessCaseAsync");
                     await SendSuccessAsync();
@@ -511,6 +513,8 @@ namespace CheckForLocation
                     sovereignLocation = await CheckForLocationAsync(caseDetails.Subject + " " + searchText);
                     if (caseDetails.contactUs && !sovereignLocation.Success)
                     {
+                        //TODO Not finding location on occasion for NNC
+                        Console.WriteLine("INFO : Checking for Location Using customerAddress : " + caseDetails.customerAddress);
                         sovereignLocation = await CheckForLocationAsync(caseDetails.customerAddress);
                     }
                     String service = "";
@@ -524,7 +528,15 @@ namespace CheckForLocation
                     else
                     {
                         Console.WriteLine(caseReference + " : SovereignServiceArea not set using Lex ");
-                        service = await GetServiceAsync(caseDetails.fullEmail);
+                        //TODO use subject then fullemail
+                        if(!caseDetails.Subject.ToLower().Contains("council form has been submitted"))
+                        {
+                            service = await GetServiceAsync(caseDetails.Subject,true);
+                        }
+                        if (service.Equals(""))
+                        {
+                            service = await GetServiceAsync(caseDetails.fullEmail,false);
+                        }                                             
                     }
 
                     if (sovereignLocation.Success)
@@ -757,6 +769,7 @@ namespace CheckForLocation
 
         private async Task<Location> CheckForLocationAsync(String emailBody)
         {
+            Console.WriteLine("INFO : Checking for Location");
             emailBody = emailBody.Replace("\n", " ");
             emailBody = emailBody.Trim();
             Location sovereignLocation = new Location();
@@ -776,7 +789,9 @@ namespace CheckForLocation
                 {
                     sovereignLocation.PostcodeFound = true;
                     GroupCollection groups = match.Groups;
+                    Console.WriteLine(caseReference + " : INFO : CheckPostcode input : " + groups[0].Value);
                     Postcode postCodeData = await CheckPostcode(groups[0].Value);
+                    Console.WriteLine(caseReference + " : INFO : CheckPostcode response : " + postCodeData.success);
                     try
                     {
                         if (postCodeData.success)
@@ -793,11 +808,13 @@ namespace CheckForLocation
 
             if (sovereignLocation.PostcodeFound)
             {
+                Console.WriteLine("INFO : Found Postcode");
                 return sovereignLocation;
             }
 
             if (west)
             {
+                Console.WriteLine("INFO : Checking for West Locations");
                 if (emailBody.ToLower().Contains("northampton") || await IsInArea(emailBody.ToLower(), "LocationsNorthampton"))
                 {
                     sovereignLocation.SovereignCouncilName = "Northampton";
@@ -856,6 +873,7 @@ namespace CheckForLocation
             }
             else
             {
+                Console.WriteLine("INFO : Checking for North Locations");
                 if (emailBody.ToLower().Contains("wellingborough") || await IsInArea(emailBody.ToLower(), "LocationsWellingborough"))
                 {
                     sovereignLocation.SovereignCouncilName = "Wellingborough";
@@ -930,6 +948,7 @@ namespace CheckForLocation
                 try
                 {
                     String responseString = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine(caseReference + " : INFO : APIResponse : " + responseString);
                     JObject caseSearch = JObject.Parse(responseString);
                     try
                     {
@@ -1079,19 +1098,31 @@ namespace CheckForLocation
             return true; ;
         }
 
-        private async Task<string> GetServiceAsync(String customerContact)
+        private async Task<string> GetServiceAsync(String customerContact, Boolean usingSubject)
         {
             try
             {
                 AmazonLexClient lexClient = new AmazonLexClient(primaryRegion);
-                PostTextRequest textRequest = new PostTextRequest();
-                textRequest.UserId = "MailBot";
-                textRequest.BotAlias = lexAlias;
-                textRequest.BotName = "UnitaryServices";
-                textRequest.InputText = customerContact;
+                PostTextRequest textRequest = new PostTextRequest
+                {
+                    UserId = "MailBot",
+                    BotAlias = lexAlias,
+                    BotName = "UnitaryServices",
+                    InputText = customerContact
+                };
                 PostTextResponse textResponse = await lexClient.PostTextAsync(textRequest);
                 HttpStatusCode temp = textResponse.HttpStatusCode;
                 String intentName = textResponse.IntentName;
+                if (usingSubject)
+                {
+                    if(long.TryParse(SubjectServiceMinConfidence, out long minConfidence))
+                    {
+                        if (String.IsNullOrEmpty(intentName) || textResponse.NluIntentConfidence.Score < (minConfidence/100))
+                        {
+                            return "";
+                        }
+                    }
+                }
                 if (String.IsNullOrEmpty(intentName))
                 {
                     intentName = "default";
@@ -1136,8 +1167,7 @@ namespace CheckForLocation
                 GetItemResponse response = await dynamoDBClient.GetItemAsync(request);
 
                 Dictionary<String, AttributeValue> attributeMap = response.Item;
-                AttributeValue sovereignEmailAttribute;
-                attributeMap.TryGetValue("email", out sovereignEmailAttribute);
+                attributeMap.TryGetValue("email", out AttributeValue sovereignEmailAttribute);
                 String sovereignEmail = "";
                 try
                 {
@@ -1169,8 +1199,7 @@ namespace CheckForLocation
                 GetItemResponse response = await dynamoDBClient.GetItemAsync(request);
 
                 Dictionary<String, AttributeValue> attributeMap = response.Item;
-                AttributeValue sovereignEmailAttribute;
-                attributeMap.TryGetValue("email", out sovereignEmailAttribute);
+                attributeMap.TryGetValue("email", out AttributeValue sovereignEmailAttribute);
                 String sovereignEmail = "";
                 try
                 {
@@ -1321,8 +1350,10 @@ namespace CheckForLocation
         {
             try
             {
-                HttpClient cxmClient = new HttpClient();
-                cxmClient.BaseAddress = new Uri("https://api.trello.com");
+                HttpClient cxmClient = new HttpClient
+                {
+                    BaseAddress = new Uri("https://api.trello.com")
+                };
                 String requestParameters = "key=" + secrets.trelloAPIKey;
                 requestParameters += "&token=" + secrets.trelloAPIToken;
                 requestParameters += "&idList=" + secrets.trelloBoardTrainingListPending;
@@ -1359,8 +1390,10 @@ namespace CheckForLocation
         private async Task SendSuccessAsync()
         {
             AmazonStepFunctionsClient client = new AmazonStepFunctionsClient();
-            SendTaskSuccessRequest successRequest = new SendTaskSuccessRequest();
-            successRequest.TaskToken = taskToken;
+            SendTaskSuccessRequest successRequest = new SendTaskSuccessRequest
+            {
+                TaskToken = taskToken
+            };
             Dictionary<String, String> result = new Dictionary<String, String>
             {
                 { "Result"  , "Success"  },
@@ -1384,10 +1417,12 @@ namespace CheckForLocation
         private async Task SendFailureAsync(String failureCause, String failureError)
         {
             AmazonStepFunctionsClient client = new AmazonStepFunctionsClient();
-            SendTaskFailureRequest failureRequest = new SendTaskFailureRequest();
-            failureRequest.Cause = failureCause;
-            failureRequest.Error = failureError;
-            failureRequest.TaskToken = taskToken;
+            SendTaskFailureRequest failureRequest = new SendTaskFailureRequest
+            {
+                Cause = failureCause,
+                Error = failureError,
+                TaskToken = taskToken
+            };
 
             try
             {
@@ -1446,33 +1481,30 @@ namespace CheckForLocation
 
         public async Task<Boolean> SendEmailAsync(String from, String fromAddress, String toAddress, String bccAddress, String subject, String emailID, String htmlBody, String textBody, Boolean includeOriginalEmail)
         {
-            using (AmazonSimpleEmailServiceClient client = new AmazonSimpleEmailServiceClient(RegionEndpoint.EUWest1))
+            using AmazonSimpleEmailServiceClient client = new AmazonSimpleEmailServiceClient(RegionEndpoint.EUWest1);
+            try
             {
-                try
-                {
-                    SendRawEmailRequest sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, textBody, bccAddress, includeOriginalEmail)) };
-                    SendRawEmailResponse response = await client.SendRawEmailAsync(sendRequest);
-                    return true;
-                }
-                catch (ApplicationException error)
-                {
-                    throw new ApplicationException(error.Message);
-                }
-                catch (Exception error)
-                {
-                    Console.WriteLine(caseReference + " : Error Sending Raw Email : " + error.Message);
-                    return false;
-                }
-
+                SendRawEmailRequest sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, bccAddress, includeOriginalEmail)) };
+                SendRawEmailResponse response = await client.SendRawEmailAsync(sendRequest);
+                return true;
+            }
+            catch (ApplicationException error)
+            {
+                throw new ApplicationException(error.Message);
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine(caseReference + " : Error Sending Raw Email : " + error.Message);
+                return false;
             }
         }
 
-        private async Task<MemoryStream> GetMessageStreamAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
+        private async Task<MemoryStream> GetMessageStreamAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String bccAddress, Boolean includeOriginalEmail)
         {
             MemoryStream stream = new MemoryStream();
             try
             {
-                MimeMessage message = await GetMessageAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, textBody, bccAddress, includeOriginalEmail);
+                MimeMessage message = await GetMessageAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, bccAddress, includeOriginalEmail);
                 message.WriteTo(stream);
                 return stream;
             }
@@ -1482,7 +1514,7 @@ namespace CheckForLocation
             }
         }
 
-        private async Task<MimeMessage> GetMessageAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String textBody, String bccAddress, Boolean includeOriginalEmail)
+        private async Task<MimeMessage> GetMessageAsync(String from, String fromAddress, String toAddress, String subject, String emailID, String htmlBody, String bccAddress, Boolean includeOriginalEmail)
         {
             MimeMessage message = new MimeMessage();
             message.From.Add(new MailboxAddress(from, fromAddress));
@@ -1495,6 +1527,7 @@ namespace CheckForLocation
                 BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
                 message.Body = bodyBuilder.ToMessageBody();
                 //message = await GetMessageBodyAsync2(message, emailID, htmlBody, textBody, includeOriginalEmail);
+                message = await GetMessageBodyAsync(message, emailID, htmlBody, includeOriginalEmail);
                 return message;
             }
             catch (ApplicationException error)
@@ -1503,54 +1536,7 @@ namespace CheckForLocation
             }
         }
 
-        private async Task<BodyBuilder> GetMessageBodyAsync(String emailID, String htmlBody, String textBody, Boolean includeOriginalEmail)
-        {
-            BodyBuilder body = new BodyBuilder()
-            {
-                HtmlBody = @htmlBody,
-                TextBody = textBody
-            };
-
-            if (includeOriginalEmail)
-            {
-                try
-                {
-                    AmazonS3Client s3 = new AmazonS3Client(emailsRegion);
-                    GetObjectResponse image = await s3.GetObjectAsync(emailBucket, emailID);
-                    byte[] imageBytes = new byte[image.ContentLength];
-                    using (MemoryStream ms = new MemoryStream())
-                    {
-                        int read;
-                        byte[] buffer = new byte[16 * 1024];
-                        while ((read = image.ResponseStream.Read(buffer, 0, buffer.Length)) > 0)
-                        {
-                            ms.Write(buffer, 0, read);
-                        }
-                        imageBytes = ms.ToArray();
-                        body.Attachments.Add(caseReference + ".eml", imageBytes);
-                    }
-                }
-                catch (Exception error)
-                {
-                    UpdateCaseString("email-comments", Messages.missingEmailFile);
-                    if (west)
-                    {
-                        await TransitionCaseAsync("unitary-awaiting-review");
-                    }
-                    else
-                    {
-                        await TransitionCaseAsync("hub-awaiting-review");
-                    }
-                    Console.WriteLine(caseReference + " : Error Attaching original email : " + error.Message);
-                    throw new ApplicationException("Error Attaching original email");
-                }
-
-            }
-            return body;
-
-        }
-
-        private async Task<MimeMessage> GetMessageBodyAsync2(MimeMessage message, String emailID, String htmlBody, String textBody, Boolean includeOriginalEmail)
+        private async Task<MimeMessage> GetMessageBodyAsync(MimeMessage message, String emailID, String htmlBody, Boolean includeOriginalEmail)
         {
             byte[] textBodyBytes = Encoding.UTF8.GetBytes("Test");
             byte[] htmlBodyBytes = Encoding.UTF8.GetBytes(htmlBody);
@@ -1561,11 +1547,15 @@ namespace CheckForLocation
             html.ContentTransferEncoding = ContentEncoding.Base64;
             plain.SetText(Encoding.UTF8, Encoding.Default.GetString(textBodyBytes));
             html.SetText(Encoding.UTF8, Encoding.Default.GetString(htmlBodyBytes));
-            MultipartAlternative alternative = new MultipartAlternative();
-            alternative.Add(plain);
-            alternative.Add(html);
-            Multipart multipart = new Multipart("mixed");
-            multipart.Add(alternative);
+            MultipartAlternative alternative = new MultipartAlternative
+            {
+                plain,
+                html
+            };
+            Multipart multipart = new Multipart("mixed")
+            {
+                alternative
+            };
 
             if (includeOriginalEmail)
             {
@@ -1714,6 +1704,8 @@ public class Secrets
     public String botPersona1 { get; set; }
     public String botPersona2 { get; set; }
     public String RedirectURI { get; set; }
+    public String SubjectServiceMinConfidenceTest { get; set; }
+    public String SubjectServiceMinConfidenceLive { get; set; }
 }
 
 public class Location

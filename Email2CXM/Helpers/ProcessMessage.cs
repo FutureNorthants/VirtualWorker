@@ -56,6 +56,7 @@ namespace Email2CXM.Helpers
         public string telNo { get; set; } = null;
         public string address { get; set; } = null;
         public string ContactUsTableMapping { get; set; } = null;
+
         private string MyCouncilEndPoint = "";
 
         private Boolean create = true;
@@ -1392,9 +1393,7 @@ namespace Email2CXM.Helpers
         {
             Success = false;
             CaseReference = "";
-        }
-
-        
+        }   
     }
 
     public class Secrets
