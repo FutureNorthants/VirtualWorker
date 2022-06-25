@@ -1,0 +1,22 @@
+{
+    "messageVersion": "1.0",
+    "invocationSource": "DialogCodeHook | FulfillmentCodeHook",
+    "inputMode": "Text",
+    "responseContentType": "PlainText",
+    "sessionId": "string",
+    "inputTranscript": "string",
+    "bot": {
+        "id": "string",
+        "name": "string",
+        "aliasId": "string",
+        "localeId": "string",
+        "version": "string"
+    },
+    "interpretations": [
+        {
+            "intent": {
+                "name": "Debug"
+            }
+        }
+    ]
+}

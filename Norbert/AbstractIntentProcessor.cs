@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Amazon.Lambda.Core;
-using Amazon.Lambda.LexEvents;
+using Amazon.Lambda.LexV2Events;
 
 namespace Norbert;
 
@@ -18,7 +18,7 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
     /// <param name="lexEvent"></param>
     /// <param name="context"></param>
     /// <returns></returns>
-    public abstract LexResponse Process(LexEvent lexEvent, ILambdaContext context);
+    public abstract LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context);
 
     //protected string SerializeReservation(FlowerOrder order)
     //{
@@ -33,61 +33,75 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
     //    return JsonSerializer.Deserialize<FlowerOrder>(json) ?? new FlowerOrder()   ;
     //}
 
-    protected LexResponse Close(IDictionary<string, string> sessionAttributes, string fulfillmentState, LexResponse.LexMessage message)
+    protected LexV2Response Close(String intent, String fulfillmentState, String responseMessage, IDictionary<String, String> requestAttributes)
     {
-        return new LexResponse
+        LexV2SessionState sessionState = new()
         {
-            SessionAttributes = sessionAttributes,
-            DialogAction = new LexResponse.LexDialogAction
+            DialogAction = new LexV2DialogAction
             {
-                Type = "Close",
-                FulfillmentState = fulfillmentState,
-                Message = message
+                Type = "Close"
+            },
+            Intent = new LexV2Intent 
+            { 
+                Name = intent,
+                State = fulfillmentState 
             }
+        };
+        LexV2Message[] messages = new LexV2Message[1];
+        messages[0] = new LexV2Message
+        {
+            ContentType = "PlainText",
+            Content = responseMessage
+        };
+        return new LexV2Response
+        {
+            SessionState = sessionState,
+            Messages = messages,
+            RequestAttributes = requestAttributes   
         };
     }
 
-    protected LexResponse Delegate(IDictionary<string, string> sessionAttributes, IDictionary<string, string?> slots)
-    {
-        return new LexResponse
-        {
-            SessionAttributes = sessionAttributes,
-            DialogAction = new LexResponse.LexDialogAction
-            {
-                Type = "Delegate",
-                Slots = slots
-            }
-        };
-    }
+    //protected LexV2Response Delegate(IDictionary<string, string> sessionAttributes, IDictionary<string, string?> slots)
+    //{
+    //    return new LexV2Response
+    //    {
+    //        SessionAttributes = sessionAttributes,
+    //        DialogAction = new LexResponse.LexDialogAction
+    //        {
+    //            Type = "Delegate",
+    //            Slots = slots
+    //        }
+    //    };
+    //}
 
-    protected LexResponse ElicitSlot(IDictionary<string, string> sessionAttributes, string intentName, IDictionary<string, string?> slots, string? slotToElicit, LexResponse.LexMessage? message)
-    {
-        return new LexResponse
-        {
-            SessionAttributes = sessionAttributes,
-            DialogAction = new LexResponse.LexDialogAction
-            {
-                Type = "ElicitSlot",
-                IntentName = intentName,
-                Slots = slots,
-                SlotToElicit = slotToElicit,
-                Message = message
-            }
-        };
-    }
+    //protected LexV2Response ElicitSlot(IDictionary<string, string> sessionAttributes, string intentName, IDictionary<string, string?> slots, string? slotToElicit, LexResponse.LexMessage? message)
+    //{
+    //    return new LexV2Response
+    //    {
+    //        SessionAttributes = sessionAttributes,
+    //        DialogAction = new LexResponse.LexDialogAction
+    //        {
+    //            Type = "ElicitSlot",
+    //            IntentName = intentName,
+    //            Slots = slots,
+    //            SlotToElicit = slotToElicit,
+    //            Message = message
+    //        }
+    //    };
+    //}
 
-    protected LexResponse ConfirmIntent(IDictionary<string, string> sessionAttributes, string intentName, IDictionary<string, string?> slots, LexResponse.LexMessage? message)
-    {
-        return new LexResponse
-        {
-            SessionAttributes = sessionAttributes,
-            DialogAction = new LexResponse.LexDialogAction
-            {
-                Type = "ConfirmIntent",
-                IntentName = intentName,
-                Slots = slots,
-                Message = message
-            }
-        };
-    }
+    //protected LexV2Response ConfirmIntent(IDictionary<string, string> sessionAttributes, string intentName, IDictionary<string, string?> slots, LexResponse.LexMessage? message)
+    //{
+    //    return new LexResponse
+    //    {
+    //        SessionAttributes = sessionAttributes,
+    //        DialogAction = new LexResponse.LexDialogAction
+    //        {
+    //            Type = "ConfirmIntent",
+    //            IntentName = intentName,
+    //            Slots = slots,
+    //            Message = message
+    //        }
+    //    };
+    //}
 }

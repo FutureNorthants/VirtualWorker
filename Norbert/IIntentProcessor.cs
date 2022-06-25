@@ -1,5 +1,5 @@
 using Amazon.Lambda.Core;
-using Amazon.Lambda.LexEvents;
+using Amazon.Lambda.LexV2Events;
 
 namespace Norbert;
 
@@ -14,5 +14,5 @@ public interface IIntentProcessor
     /// <param name="lexEvent"></param>
     /// <param name="context"></param>
     /// <returns></returns>
-    LexResponse Process(LexEvent lexEvent, ILambdaContext context);
+    LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context);
 }

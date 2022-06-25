@@ -12,7 +12,7 @@
     "function-runtime" : "dotnet6",
     "function-memory-size" : 512,
     "function-timeout"     : 15,
-    "function-handler"     : "LambdaTest::LambdaTest.LambdaHandler::handleRequest",
+    "function-handler"     : "Norbert::Norbert.Function::FunctionHandler",
     "framework"            : "net6.0",
     "function-name"        : "norbert",
     "function-description" : "Norbert Chat",

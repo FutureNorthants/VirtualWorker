@@ -8,11 +8,11 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Amazon.Lambda.Core" Version="2.0.0" />
+    <PackageReference Include="Amazon.Lambda.Core" Version="2.1.0" />
     <PackageReference Include="Amazon.Lambda.S3Events" Version="2.0.1" />
     <PackageReference Include="Amazon.Lambda.Serialization.Json" Version="2.0.0" />
-    <PackageReference Include="AWSSDK.S3" Version="3.7.1.7" />
-    <PackageReference Include="AWSSDK.SecretsManager" Version="3.7.0.35" />
-    <PackageReference Include="AWSSDK.SQS" Version="3.7.0.36" />
+    <PackageReference Include="AWSSDK.S3" Version="3.7.9.19" />
+    <PackageReference Include="AWSSDK.SecretsManager" Version="3.7.2.59" />
+    <PackageReference Include="AWSSDK.SQS" Version="3.7.2.72" />
   </ItemGroup>
 </Project>
