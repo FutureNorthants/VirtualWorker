@@ -1,0 +1,21 @@
+{
+  "messageVersion": "1.0",
+  "invocationSource": "DialogCodeHook",
+  "userId": "John",
+  "sessionAttributes": {},
+  "bot": {
+    "name": "Norbert",
+    "alias": "$LATEST",
+    "version": "$LATEST"
+  },
+  "outputDialogMode": "Text",
+  "currentIntent": {
+    "name": "Debug",
+    "slots": {
+      "AppointmentType": "whitening",
+      "Date": "2030-11-08",
+      "Time": "10:00"
+    },
+    "confirmationStatus": "None"
+  }
+}
