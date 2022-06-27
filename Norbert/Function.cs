@@ -27,18 +27,20 @@ public class Function
             Console.WriteLine("Alias     : " + lexEvent.Bot.AliasId);
             Console.WriteLine("Version   : " + lexEvent.Bot.Version);
             Console.WriteLine("Intent    : " + lexEvent.Interpretations[0].Intent.Name);
+            Console.WriteLine("Intent    : " + lexEvent.InputTranscript);
         }
         catch(Exception) { }
 
         try
         {
-            if (lexEvent.Interpretations[0].Intent.Name == "Debug")
+            switch (lexEvent.Interpretations[0].Intent.Name.ToLower())
             {
-                process = new DebugIntentProcessor();
-            }
-            else
-            {
-                throw new Exception($"Intent with name {lexEvent.Interpretations[0].Intent.Name} not supported");
+                case "debug":
+                    process = new DebugIntentProcessor();
+                    break;
+                default:
+                    process = new DefaultIntentProcessor();
+                    break;
             }
          }
         catch(Exception)

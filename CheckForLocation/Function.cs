@@ -1524,8 +1524,8 @@ namespace CheckForLocation
 
             try
             {
-                BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
-                message.Body = bodyBuilder.ToMessageBody();
+                //BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
+                //message.Body = bodyBuilder.ToMessageBody();
                 //message = await GetMessageBodyAsync2(message, emailID, htmlBody, textBody, includeOriginalEmail);
                 message = await GetMessageBodyAsync(message, emailID, htmlBody, includeOriginalEmail);
                 return message;
