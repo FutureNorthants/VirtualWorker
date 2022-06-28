@@ -12,13 +12,13 @@ public class DefaultIntentProcessor : AbstractIntentProcessor
 {
     public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context)
     {
-        IDictionary<string, string> sessionAttributes = lexEvent.RequestAttributes ?? new Dictionary<string, string>();
+        IDictionary<string, string> requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<string, string>();
 
         return Close(
                     "Default",
                     "Fulfilled",
                     getFAQResponseAsync(lexEvent.InputTranscript),
-                    sessionAttributes
+                    requestAttributes
                 );
     }
 

@@ -38,6 +38,9 @@ public class Function
                 case "debug":
                     process = new DebugIntentProcessor();
                     break;
+                case "collectionday":
+                    process = new CollectionDayIntentProcessor();
+                    break;
                 default:
                     process = new DefaultIntentProcessor();
                     break;
