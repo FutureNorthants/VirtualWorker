@@ -35,6 +35,7 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
 
     protected LexV2Response Close(String intent, String fulfillmentState, String responseMessage, IDictionary<String, String> requestAttributes)
     {
+        Console.WriteLine("Closing");
         LexV2SessionState sessionState = new()
         {
             DialogAction = new LexV2DialogAction
@@ -61,18 +62,28 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
         };
     }
 
-    //protected LexV2Response Delegate(IDictionary<string, string> sessionAttributes, IDictionary<string, string?> slots)
-    //{
-    //    return new LexV2Response
-    //    {
-    //        SessionAttributes = sessionAttributes,
-    //        DialogAction = new LexResponse.LexDialogAction
-    //        {
-    //            Type = "Delegate",
-    //            Slots = slots
-    //        }
-    //    };
-    //}
+    protected LexV2Response Delegate(String intent, IDictionary<String, String> requestAttributes)
+    {
+        Console.WriteLine("Delegating");
+        LexV2SessionState sessionState = new()
+        {
+            DialogAction = new LexV2DialogAction
+            {
+                Type = "Delegate"
+            },
+            Intent = new LexV2Intent
+            {
+                Name = intent,
+                State = "ReadyForFulfillment"
+            }
+        };
+
+        return new LexV2Response
+        {
+            SessionState = sessionState,
+            RequestAttributes = requestAttributes
+        };
+    }
 
     //protected LexV2Response ElicitSlot(IDictionary<string, string> sessionAttributes, string intentName, IDictionary<string, string?> slots, string? slotToElicit, LexResponse.LexMessage? message)
     //{

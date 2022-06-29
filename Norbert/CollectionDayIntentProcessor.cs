@@ -14,14 +14,23 @@ public class CollectionDayIntentProcessor : AbstractIntentProcessor
     {
         IDictionary<String, String> requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
         IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots = lexEvent.Interpretations[0].Intent.Slots;
-        LexV2.LexIntentV2.LexSlotValueV2 slotValue = slots["Postcode"].Value;
 
-        return Close(
-                    "Default",
-                    "Fulfilled",
-                    getBinCollectionDetails(slotValue.InterpretedValue),
-                    requestAttributes
-                );
+        try
+        {
+            LexV2.LexIntentV2.LexSlotValueV2 slotValue = slots["Postcode"].Value;
+
+            return Close(
+                        "Default",
+                        "Fulfilled",
+                        getBinCollectionDetails(slotValue.InterpretedValue),
+                        requestAttributes
+                    );
+        }
+        catch(Exception)
+        {
+            return Delegate(lexEvent.ProposedNextState.Intent.Name,requestAttributes);
+        }
+        
     }
 
     private String getBinCollectionDetails(String postCode)

@@ -23,11 +23,13 @@ public class Function
         try
         {
             Console.WriteLine("------------");
-            Console.WriteLine("Bot       : " + lexEvent.Bot.Name);
-            Console.WriteLine("Alias     : " + lexEvent.Bot.AliasId);
-            Console.WriteLine("Version   : " + lexEvent.Bot.Version);
-            Console.WriteLine("Intent    : " + lexEvent.Interpretations[0].Intent.Name);
-            Console.WriteLine("Intent    : " + lexEvent.InputTranscript);
+            Console.WriteLine("Bot           : " + lexEvent.Bot.Name);
+            Console.WriteLine("Alias         : " + lexEvent.Bot.AliasId);
+            Console.WriteLine("Version       : " + lexEvent.Bot.Version);
+            Console.WriteLine("Intent        :  " + lexEvent.Interpretations[0].Intent.Name);
+            Console.WriteLine("Transcription : " + lexEvent.InputTranscript);
+            Console.WriteLine("Source        : " + lexEvent.InvocationSource);
+            Console.WriteLine("Next Type     : " + lexEvent.ProposedNextState.DialogAction.Type);
         }
         catch(Exception) { }
 
