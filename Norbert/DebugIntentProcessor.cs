@@ -23,15 +23,14 @@ public class DebugIntentProcessor : AbstractIntentProcessor
     /// <param name="lexEvent"></param>
     /// <param name="context"></param>
     /// <returns></returns>
-    public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context)
+    public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context, IDictionary<String, String> requestAttributes, IDictionary<String, String> sessionAttributes, IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots)
     {
-        IDictionary<string, string> requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<string, string>();
-
-        return Close(
+         return Close(
                     "Debug",
                     "Fulfilled",
                     "Hello World2!",
-                    requestAttributes
+                    requestAttributes,
+                    sessionAttributes
                 );
     }
 }

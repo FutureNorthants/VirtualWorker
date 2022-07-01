@@ -33,6 +33,10 @@ public class Function
         }
         catch(Exception) { }
 
+        IDictionary<String, String> requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
+        IDictionary<String, String> sessionAttributes = lexEvent.SessionState.SessionAttributes ?? new Dictionary<String, String>();
+        IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots = lexEvent.Interpretations[0].Intent.Slots;
+
         try
         {
             switch (lexEvent.Interpretations[0].Intent.Name.ToLower())
@@ -52,6 +56,6 @@ public class Function
         {
             process = new DefaultIntentProcessor();
         }
-        return process.Process(lexEvent, context);
+        return process.Process(lexEvent, context, sessionAttributes, requestAttributes, slots);
     }
 }

@@ -18,7 +18,7 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
     /// <param name="lexEvent"></param>
     /// <param name="context"></param>
     /// <returns></returns>
-    public abstract LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context);
+    public abstract LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context, IDictionary<String, String> sessionAttributes, IDictionary<String, String> requestAttributes, IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots);
 
     //protected string SerializeReservation(FlowerOrder order)
     //{
@@ -33,7 +33,7 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
     //    return JsonSerializer.Deserialize<FlowerOrder>(json) ?? new FlowerOrder()   ;
     //}
 
-    protected LexV2Response Close(String intent, String fulfillmentState, String responseMessage, IDictionary<String, String> requestAttributes)
+    protected LexV2Response Close(String intent, String fulfillmentState, String responseMessage, IDictionary<String, String> requestAttributes, IDictionary<String, String> sessionAttributes)
     {
         Console.WriteLine("Closing");
         LexV2SessionState sessionState = new()
@@ -46,8 +46,9 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
             { 
                 Name = intent,
                 State = fulfillmentState 
-            }
-        };
+            },
+            SessionAttributes = new Dictionary<String, String>(sessionAttributes)
+    };
         LexV2Message[] messages = new LexV2Message[1];
         messages[0] = new LexV2Message
         {

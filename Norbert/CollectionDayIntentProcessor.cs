@@ -10,27 +10,29 @@ namespace Norbert;
 
 public class CollectionDayIntentProcessor : AbstractIntentProcessor
 {
-    public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context)
+    public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context, IDictionary<String, String> sessionAttributes, IDictionary<String, String> requestAttributes, IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots)
     {
-        IDictionary<String, String> requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
-        IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots = lexEvent.Interpretations[0].Intent.Slots;
-
         try
         {
             LexV2.LexIntentV2.LexSlotValueV2 slotValue = slots["Postcode"].Value;
-
             return Close(
                         "Default",
                         "Fulfilled",
                         getBinCollectionDetails(slotValue.InterpretedValue),
-                        requestAttributes
+                        requestAttributes,
+                        sessionAttributes
                     );
+        }
+        catch(ApplicationException error)
+        {
+            Console.WriteLine("Error : " + error.Message);
+            Console.WriteLine(error.StackTrace);
+            return Close(lexEvent.Interpretations[0].Intent.Name, "Failed","Please wait whilst we connect you to a member of staff to help with this query",requestAttributes,sessionAttributes);
         }
         catch(Exception)
         {
             return Delegate(lexEvent.ProposedNextState.Intent.Name,requestAttributes);
-        }
-        
+        }      
     }
 
     private String getBinCollectionDetails(String postCode)
@@ -52,12 +54,12 @@ public class CollectionDayIntentProcessor : AbstractIntentProcessor
             }
             else
             {
-                return "Doh! : " + postCode;
+                throw new ApplicationException("Multi Round postcode");
             }
         }
         catch (Exception error)
         {
-            return "Error : " + error.Message;
+            throw new ApplicationException("Postcode API Error : " +  error.Message);
         }
     }
 }

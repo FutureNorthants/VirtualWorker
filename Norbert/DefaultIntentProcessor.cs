@@ -10,16 +10,28 @@ namespace Norbert;
 
 public class DefaultIntentProcessor : AbstractIntentProcessor
 {
-    public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context)
+    public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context, IDictionary<String, String> requestAttributes, IDictionary<String, String> sessionAttributes, IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots)
     {
-        IDictionary<string, string> requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<string, string>();
-
-        return Close(
-                    "Default",
-                    "Fulfilled",
-                    getFAQResponseAsync(lexEvent.InputTranscript),
-                    requestAttributes
-                );
+        try
+        {
+            return Close(
+             "Default",
+             "Fulfilled",
+             getFAQResponseAsync(lexEvent.InputTranscript),
+             requestAttributes,
+             sessionAttributes
+             );
+        }
+        catch(Exception error)
+        {
+            if(error is not ApplicationException)
+            {
+                Console.WriteLine("Error : " + error.Message);
+                Console.WriteLine(error.StackTrace);
+            }
+            return Close(lexEvent.Interpretations[0].Intent.Name, "Failed", "Please wait whilst we connect you to a member of staff to help with this query", requestAttributes, sessionAttributes);
+        }
+ 
     }
 
     private String getFAQResponseAsync(String query)
@@ -44,12 +56,12 @@ public class DefaultIntentProcessor : AbstractIntentProcessor
             }
             else
             {
-                return "Beats me dude";
+                throw new ApplicationException("");
             }          
         }
         catch (Exception error)
         {
-            return "Error : " + error.Message;
+            throw new Exception(error.Message,error);
         }
     }
 }
