@@ -43,6 +43,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Norbert", "Norbert\Norbert.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Temp", "Temp\Temp.csproj", "{C750ACB8-A632-4148-BBC0-9A1BCC9E9E45}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GetGreeting", "GetGreeting\GetGreeting.csproj", "{9849983F-C602-4480-ADA9-74681E0DE2C5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -117,6 +119,10 @@ Global
 		{C750ACB8-A632-4148-BBC0-9A1BCC9E9E45}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C750ACB8-A632-4148-BBC0-9A1BCC9E9E45}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C750ACB8-A632-4148-BBC0-9A1BCC9E9E45}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9849983F-C602-4480-ADA9-74681E0DE2C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9849983F-C602-4480-ADA9-74681E0DE2C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9849983F-C602-4480-ADA9-74681E0DE2C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9849983F-C602-4480-ADA9-74681E0DE2C5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -139,6 +145,7 @@ Global
 		{8032269A-B489-4063-926A-361075391C60} = {3C0B887B-B90B-4031-A07E-DB8D36A7D4B6}
 		{98439555-32AC-48B9-BAF0-24A003A4DEC8} = {BBA02F4B-F708-4E64-AA69-BEE7078EC803}
 		{C750ACB8-A632-4148-BBC0-9A1BCC9E9E45} = {BBA02F4B-F708-4E64-AA69-BEE7078EC803}
+		{9849983F-C602-4480-ADA9-74681E0DE2C5} = {BBA02F4B-F708-4E64-AA69-BEE7078EC803}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {6FCD3CAE-A781-4930-98CF-590909FFF89D}
