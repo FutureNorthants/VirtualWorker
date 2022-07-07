@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.LexV2Events;
 
@@ -61,6 +60,43 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
             SessionState = sessionState,
             Messages = messages,
             RequestAttributes = requestAttributes   
+        };
+    }
+
+    protected static LexV2Response CloseWithResponseCard(String intent, String fulfillmentState, String responseMessage, String title, String subtitle, LexV2Button[] responseButtons, IDictionary<String,String> requestAttributes, IDictionary<String, String> sessionAttributes)
+    {
+        Console.WriteLine("Closing");
+        LexV2SessionState sessionState = new()
+        {
+            DialogAction = new LexV2DialogAction
+            {
+                Type = "Close"
+            },
+            Intent = new LexV2Intent
+            {
+                Name = intent,
+                State = fulfillmentState
+            },
+            SessionAttributes = new Dictionary<String, String>(sessionAttributes)
+        };
+        LexV2Message[] messages = new LexV2Message[1];
+        messages[0] = new LexV2Message
+        {
+            ContentType = "ImageResponseCard",
+            Content = responseMessage,
+            ImageResponseCard = new LexV2ImageResponseCard
+            {
+                Title = title,
+                Subtitle = subtitle,
+                Buttons = responseButtons
+            }
+        };
+
+        return new LexV2Response
+        {
+            SessionState = sessionState,
+            Messages = messages,
+            RequestAttributes = requestAttributes
         };
     }
 
