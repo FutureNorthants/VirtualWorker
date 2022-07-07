@@ -12,12 +12,12 @@ namespace GetGreeting;
 
 public class GreetingResponse
 {
-    public String? greeting { get; set; }
+    public String? Greeting { get; set; }
 }
 public class Function
 {
     private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
-    public GreetingResponse FunctionHandler(Object input, ILambdaContext context)
+    public static GreetingResponse FunctionHandler(Object input, ILambdaContext context)
     {
         String continuationTableName = Environment.GetEnvironmentVariable("continuationTableNameTest")!;
         try
@@ -73,7 +73,7 @@ public class Function
         {
             GreetingResponse greeting = new()
             {
-                greeting = "Hello. I am " + personaName + ", your virtual contact centre agent. How can I help you today? Type 'help' if you're not sure, if I can't help you one of my colleagues will join the chat to assist you.",
+                Greeting = "Hello. I am " + personaName + ", your virtual contact centre agent. How can I help you today? Type 'help' if you're not sure, if I can't help you one of my colleagues will join the chat to assist you.",
             };
             return greeting;
         }
@@ -81,12 +81,12 @@ public class Function
         {
             GreetingResponse greeting = new()
             {
-                greeting = getContinuationMessage(continuationTableName)
+                Greeting = GetContinuationMessage(continuationTableName)
         };
             return greeting;
         }
     }
-    private String getContinuationMessage(String continuationTableName) 
+    private static String GetContinuationMessage(String continuationTableName) 
     {
         try
         {
@@ -94,14 +94,14 @@ public class Function
 
             Table productCatalogTable = Table.LoadTable(dynamoDBClient, continuationTableName);
             ScanFilter scanFilter = new();
-            ScanOperationConfig config = new ScanOperationConfig()
+            ScanOperationConfig config = new()
             {
                 Filter = scanFilter,
                 Select = SelectValues.SpecificAttributes,
                 AttributesToGet = new List<string> { "Message" }
             };
             Search search = productCatalogTable.Scan(config);
-            List<Document> allTheMessages = new List<Document>();
+            List<Document> allTheMessages = new();
             do
             {
                 List<Document> batchOfRecords = search.GetNextSetAsync().Result;
@@ -111,10 +111,9 @@ public class Function
                    allTheMessages.Add(message); 
                 }
             } while (!search.IsDone);
-            Random random = new Random();         
+            Random random = new();         
             Document[] arrayOfAllTheMessages = allTheMessages.ToArray();
-            DynamoDBEntry response;
-            arrayOfAllTheMessages[random.Next(allTheMessages.Count)].TryGetValue("Message", out response);
+            arrayOfAllTheMessages[random.Next(allTheMessages.Count)].TryGetValue("Message", out DynamoDBEntry response);
             return response;
         }
         catch(Exception error)
@@ -122,6 +121,5 @@ public class Function
             Console.WriteLine("ERROR Getting Continuation Responses : " + error.Message);
             return "Anything else??";
         }
-        return "";
     }
 }
