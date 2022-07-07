@@ -25,10 +25,32 @@ public class DebugIntentProcessor : AbstractIntentProcessor
     /// <returns></returns>
     public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context, IDictionary<String, String> requestAttributes, IDictionary<String, String> sessionAttributes, IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots)
     {
-         return Close(
+        String instance = "Beta";
+        try
+        {
+            if (context.InvokedFunctionArn.ToLower().Contains("prod"))
+            {
+                instance = " Prod";
+            }
+        }
+        catch (Exception){}
+        DateTime currentTime = DateTime.UtcNow.ToLocalTime();
+        try
+        {
+            TimeZoneInfo curTimeZone = TimeZoneInfo.Local;
+            if (curTimeZone.IsDaylightSavingTime(DateTime.Now))
+            {
+                currentTime.AddHours(1);
+            }
+        }
+        catch (Exception error)
+        {
+            Console.WriteLine("Error : " + error.Message);
+        }
+        return Close(
                     "Debug",
                     "Fulfilled",
-                    "Hello World2!",
+                    context.FunctionName + "( " + instance + " " + context.FunctionVersion + " ) @ " + currentTime.ToString("dddd, dd MMMM yyyy HH:mm:ss"),
                     requestAttributes,
                     sessionAttributes
                 );

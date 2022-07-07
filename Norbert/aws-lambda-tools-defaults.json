@@ -23,6 +23,6 @@
     "function-security-groups" : "",
     "dead-letter-target-arn"   : "arn:aws:sqs:eu-west-2:609845412203:LambdaDLQ",
     "tracing-mode"             : "PassThrough",
-    "environment-variables"    : "",
+    "environment-variables"    : "\"TZ\"=\"Europe/London\"",
     "image-tag"                : ""
 }

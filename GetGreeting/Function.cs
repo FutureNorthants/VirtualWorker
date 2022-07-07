@@ -1,3 +1,8 @@
+using Amazon;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.DataModel;
+using Amazon.DynamoDBv2.DocumentModel;
+using Amazon.DynamoDBv2.Model;
 using Amazon.Lambda.Core;
 using System.Text.Json.Nodes;
 
@@ -11,8 +16,18 @@ public class GreetingResponse
 }
 public class Function
 {
+    private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
     public GreetingResponse FunctionHandler(Object input, ILambdaContext context)
     {
+        String continuationTableName = Environment.GetEnvironmentVariable("continuationTableNameTest")!;
+        try
+        {
+            if (context.InvokedFunctionArn.ToLower().Contains("prod"))
+            {
+                continuationTableName = Environment.GetEnvironmentVariable("continuationTableNameLive")!;
+            }
+        }
+        catch (Exception) { }
         Console.WriteLine("Payload : " + input);
         String personaName = "";
         try
@@ -32,7 +47,7 @@ public class Function
         try
         {
             JsonNode connectJSON = JsonNode.Parse(input.ToString()!)!;
-            Console.WriteLine("gREETINGtYPE : " + connectJSON["Details"]!["ContactData"]!["Attributes"]!["greetingType"]!.GetValue<String>().ToLower());
+            Console.WriteLine("GreetingType : " + connectJSON["Details"]!["ContactData"]!["Attributes"]!["greetingType"]!.GetValue<String>().ToLower());
             if (connectJSON["Details"]!["ContactData"]!["Attributes"]!["greetingType"]!.GetValue<String>().ToLower().Equals("initial"))
             {
                 initialGreeting = true;
@@ -66,10 +81,47 @@ public class Function
         {
             GreetingResponse greeting = new()
             {
-                greeting = "Is there anything else I can help you with today?",
-            };
+                greeting = getContinuationMessage(continuationTableName)
+        };
             return greeting;
         }
- 
+    }
+    private String getContinuationMessage(String continuationTableName) 
+    {
+        try
+        {
+            AmazonDynamoDBClient dynamoDBClient = new(primaryRegion);
+
+            Table productCatalogTable = Table.LoadTable(dynamoDBClient, continuationTableName);
+            ScanFilter scanFilter = new();
+            ScanOperationConfig config = new ScanOperationConfig()
+            {
+                Filter = scanFilter,
+                Select = SelectValues.SpecificAttributes,
+                AttributesToGet = new List<string> { "Message" }
+            };
+            Search search = productCatalogTable.Scan(config);
+            List<Document> allTheMessages = new List<Document>();
+            do
+            {
+                List<Document> batchOfRecords = search.GetNextSetAsync().Result;
+
+                foreach (Document message in batchOfRecords)
+                {
+                   allTheMessages.Add(message); 
+                }
+            } while (!search.IsDone);
+            Random random = new Random();         
+            Document[] arrayOfAllTheMessages = allTheMessages.ToArray();
+            DynamoDBEntry response;
+            arrayOfAllTheMessages[random.Next(allTheMessages.Count)].TryGetValue("Message", out response);
+            return response;
+        }
+        catch(Exception error)
+        {
+            Console.WriteLine("ERROR Getting Continuation Responses : " + error.Message);
+            return "Anything else??";
+        }
+        return "";
     }
 }

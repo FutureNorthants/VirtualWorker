@@ -22,6 +22,6 @@
     "function-subnets"      : "",
     "function-security-groups" : "",
     "tracing-mode"             : "PassThrough",
-    "environment-variables"    : "\"TZ\"=\"Europe/London\";\"femalePersona\"=\"Norberta\";\"malePersona\"=\"Norbert\"",
+    "environment-variables"    : "\"continuationTableNameLive\"=\"BotContinuationMessagesLive\";\"continuationTableNameTest\"=\"BotContinuationMessagesTest\";\"TZ\"=\"Europe/London\";\"femalePersona\"=\"Norberta\";\"malePersona\"=\"Norbert\"",
     "image-tag"                : ""
 }

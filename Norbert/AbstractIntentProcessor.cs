@@ -49,12 +49,13 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
             },
             SessionAttributes = new Dictionary<String, String>(sessionAttributes)
     };
-        LexV2Message[] messages = new LexV2Message[1];
-        messages[0] = new LexV2Message
-        {
-            ContentType = "PlainText",
-            Content = responseMessage
-        };
+        LexV2Message[] messages =  new LexV2Message[1];
+            messages[0] = new LexV2Message
+            {
+                ContentType = "PlainText",
+                Content = responseMessage
+            };
+  
         return new LexV2Response
         {
             SessionState = sessionState,
