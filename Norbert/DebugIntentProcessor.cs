@@ -1,37 +1,56 @@
 using Amazon.Lambda.Core;
 using Amazon.Lambda.LexV2Events;
 
-using static Norbert.FlowerOrder;
-
 namespace Norbert;
 
 public class DebugIntentProcessor : AbstractIntentProcessor
 {
-    public const string TYPE_SLOT = "FlowerType";
-    public const string PICK_UP_DATE_SLOT = "PickupDate";
-    public const string PICK_UP_TIME_SLOT = "PickupTime";
-    public const string INVOCATION_SOURCE = "invocationSource";
-    FlowerTypes _chosenFlowerType = FlowerTypes.Null;
-
-    /// <summary>
-    /// Performs dialog management and fulfillment for ordering flowers.
-    /// 
-    /// Beyond fulfillment, the implementation for this intent demonstrates the following:
-    /// 1) Use of elicitSlot in slot validation and re-prompting
-    /// 2) Use of sessionAttributes to pass information that can be used to guide the conversation
-    /// </summary>
-    /// <param name="lexEvent"></param>
-    /// <param name="context"></param>
-    /// <returns></returns>
-    public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context)
+    public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context, IDictionary<String, String> requestAttributes, IDictionary<String, String> sessionAttributes, IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots)
     {
-        IDictionary<string, string> requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<string, string>();
+        String instance = "Beta";
+        try
+        {
+            if (context.InvokedFunctionArn.ToLower().Contains("prod"))
+            {
+                instance = " Prod";
+            }
+        }
+        catch (Exception){}
+        DateTime currentTime = DateTime.UtcNow.ToLocalTime();
+        try
+        {
+            TimeZoneInfo curTimeZone = TimeZoneInfo.Local;
+            if (curTimeZone.IsDaylightSavingTime(DateTime.Now))
+            {
+                currentTime.AddHours(1);
+            }
+        }
+        catch (Exception error)
+        {
+            Console.WriteLine("Error : " + error.Message);
+        }
+        //LexV2Button[] buttons = new LexV2Button[4];
+        //buttons[0] = new LexV2Button { Text = "Leave a message", Value = "message"};
+        //buttons[1] = new LexV2Button { Text = "Request a callback", Value = "callback"};
+        //buttons[2] = new LexV2Button { Text = "Chat with Staff", Value = "handoff"};
+        //buttons[3] = new LexV2Button { Text = "End the chat", Value = "stop" };
+        //return CloseWithResponseCard(
+        //        "Debug",
+        //        "Fulfilled",
+        //        context.FunctionName + "( " + instance + " " + context.FunctionVersion + " ) @ " + currentTime.ToString("dddd, dd MMMM yyyy HH:mm:ss"),
+        //        "I think we need the human touch here",
+        //        "What would you like to do?",
+        //        buttons,
+        //        requestAttributes,
+        //        sessionAttributes
+        //);
 
         return Close(
                     "Debug",
                     "Fulfilled",
-                    "Hello World!",
-                    requestAttributes
+                    context.FunctionName + "( " + instance + " " + context.FunctionVersion + " ) @ " + currentTime.ToString("dddd, dd MMMM yyyy HH:mm:ss"),
+                    requestAttributes,
+                    sessionAttributes
                 );
     }
 }

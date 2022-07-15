@@ -23,28 +23,39 @@ public class Function
         try
         {
             Console.WriteLine("------------");
-            Console.WriteLine("Bot       : " + lexEvent.Bot.Name);
-            Console.WriteLine("Alias     : " + lexEvent.Bot.AliasId);
-            Console.WriteLine("Version   : " + lexEvent.Bot.Version);
-            Console.WriteLine("Intent    : " + lexEvent.Interpretations[0].Intent.Name);
+            Console.WriteLine("Bot           : " + lexEvent.Bot.Name);
+            Console.WriteLine("Alias         : " + lexEvent.Bot.AliasId);
+            Console.WriteLine("Version       : " + lexEvent.Bot.Version);
+            Console.WriteLine("Intent        :  " + lexEvent.Interpretations[0].Intent.Name);
+            Console.WriteLine("Transcription : " + lexEvent.InputTranscript);
+            Console.WriteLine("Source        : " + lexEvent.InvocationSource);
+            Console.WriteLine("Next Type     : " + lexEvent.ProposedNextState.DialogAction.Type);
         }
         catch(Exception) { }
 
+        IDictionary<String, String> requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
+        IDictionary<String, String> sessionAttributes = lexEvent.SessionState.SessionAttributes ?? new Dictionary<String, String>();
+        IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots = lexEvent.Interpretations[0].Intent.Slots;
+
         try
         {
-            if (lexEvent.Interpretations[0].Intent.Name == "Debug")
+            switch (lexEvent.Interpretations[0].Intent.Name.ToLower())
             {
-                process = new DebugIntentProcessor();
-            }
-            else
-            {
-                throw new Exception($"Intent with name {lexEvent.Interpretations[0].Intent.Name} not supported");
+                case "debug":
+                    process = new DebugIntentProcessor();
+                    break;
+                case "collectionday":
+                    process = new CollectionDayIntentProcessor();
+                    break;
+                default:
+                    process = new DefaultIntentProcessor();
+                    break;
             }
          }
         catch(Exception)
         {
             process = new DefaultIntentProcessor();
         }
-        return process.Process(lexEvent, context);
+        return process.Process(lexEvent, context, sessionAttributes, requestAttributes, slots);
     }
 }

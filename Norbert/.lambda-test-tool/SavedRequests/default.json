@@ -1,0 +1,22 @@
+{
+    "messageVersion": "1.0",
+    "invocationSource": "DialogCodeHook | FulfillmentCodeHook",
+    "inputMode": "Text",
+    "responseContentType": "PlainText",
+    "sessionId": "string",
+    "inputTranscript": "how long will it take for my benefit claim to be processed",
+    "bot": {
+        "id": "string",
+        "name": "string",
+        "aliasId": "string",
+        "localeId": "string",
+        "version": "string"
+    },
+    "interpretations": [
+        {
+            "intent": {
+                "name": "Default"
+            }
+        }
+    ]
+}

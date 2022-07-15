@@ -14,5 +14,5 @@ public interface IIntentProcessor
     /// <param name="lexEvent"></param>
     /// <param name="context"></param>
     /// <returns></returns>
-    LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context);
+    LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context, IDictionary<String, String> sessionAttributes, IDictionary<String, String> requestAttributes, IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots);
 }

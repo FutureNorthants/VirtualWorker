@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.LexV2Events;
 
@@ -18,7 +17,7 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
     /// <param name="lexEvent"></param>
     /// <param name="context"></param>
     /// <returns></returns>
-    public abstract LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context);
+    public abstract LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context, IDictionary<String, String> sessionAttributes, IDictionary<String, String> requestAttributes, IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots);
 
     //protected string SerializeReservation(FlowerOrder order)
     //{
@@ -33,8 +32,9 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
     //    return JsonSerializer.Deserialize<FlowerOrder>(json) ?? new FlowerOrder()   ;
     //}
 
-    protected LexV2Response Close(String intent, String fulfillmentState, String responseMessage, IDictionary<String, String> requestAttributes)
+    protected LexV2Response Close(String intent, String fulfillmentState, String responseMessage, IDictionary<String, String> requestAttributes, IDictionary<String, String> sessionAttributes)
     {
+        Console.WriteLine("Closing");
         LexV2SessionState sessionState = new()
         {
             DialogAction = new LexV2DialogAction
@@ -45,14 +45,16 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
             { 
                 Name = intent,
                 State = fulfillmentState 
-            }
-        };
-        LexV2Message[] messages = new LexV2Message[1];
-        messages[0] = new LexV2Message
-        {
-            ContentType = "PlainText",
-            Content = responseMessage
-        };
+            },
+            SessionAttributes = new Dictionary<String, String>(sessionAttributes)
+    };
+        LexV2Message[] messages =  new LexV2Message[1];
+            messages[0] = new LexV2Message
+            {
+                ContentType = "PlainText",
+                Content = responseMessage
+            };
+  
         return new LexV2Response
         {
             SessionState = sessionState,
@@ -61,18 +63,65 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
         };
     }
 
-    //protected LexV2Response Delegate(IDictionary<string, string> sessionAttributes, IDictionary<string, string?> slots)
-    //{
-    //    return new LexV2Response
-    //    {
-    //        SessionAttributes = sessionAttributes,
-    //        DialogAction = new LexResponse.LexDialogAction
-    //        {
-    //            Type = "Delegate",
-    //            Slots = slots
-    //        }
-    //    };
-    //}
+    protected static LexV2Response CloseWithResponseCard(String intent, String fulfillmentState, String responseMessage, String title, String subtitle, LexV2Button[] responseButtons, IDictionary<String,String> requestAttributes, IDictionary<String, String> sessionAttributes)
+    {
+        Console.WriteLine("Closing");
+        LexV2SessionState sessionState = new()
+        {
+            DialogAction = new LexV2DialogAction
+            {
+                Type = "Close"
+            },
+            Intent = new LexV2Intent
+            {
+                Name = intent,
+                State = fulfillmentState
+            },
+            SessionAttributes = new Dictionary<String, String>(sessionAttributes)
+        };
+        LexV2Message[] messages = new LexV2Message[1];
+        messages[0] = new LexV2Message
+        {
+            ContentType = "ImageResponseCard",
+            Content = responseMessage,
+            ImageResponseCard = new LexV2ImageResponseCard
+            {
+                Title = title,
+                Subtitle = subtitle,
+                Buttons = responseButtons
+            }
+        };
+
+        return new LexV2Response
+        {
+            SessionState = sessionState,
+            Messages = messages,
+            RequestAttributes = requestAttributes
+        };
+    }
+
+    protected LexV2Response Delegate(String intent, IDictionary<String, String> requestAttributes)
+    {
+        Console.WriteLine("Delegating");
+        LexV2SessionState sessionState = new()
+        {
+            DialogAction = new LexV2DialogAction
+            {
+                Type = "Delegate"
+            },
+            Intent = new LexV2Intent
+            {
+                Name = intent,
+                State = "ReadyForFulfillment"
+            }
+        };
+
+        return new LexV2Response
+        {
+            SessionState = sessionState,
+            RequestAttributes = requestAttributes
+        };
+    }
 
     //protected LexV2Response ElicitSlot(IDictionary<string, string> sessionAttributes, string intentName, IDictionary<string, string?> slots, string? slotToElicit, LexResponse.LexMessage? message)
     //{
