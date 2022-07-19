@@ -511,7 +511,6 @@ namespace CheckForLocation
                     sovereignLocation = await CheckForLocationAsync(caseDetails.Subject + " " + searchText);
                     if (caseDetails.contactUs && !sovereignLocation.Success)
                     {
-                        //TODO Not finding location on occasion for NNC
                         Console.WriteLine("INFO : Checking for Location Using customerAddress : " + caseDetails.customerAddress);
                         sovereignLocation = await CheckForLocationAsync(caseDetails.customerAddress);
                     }
@@ -527,10 +526,13 @@ namespace CheckForLocation
                     {
                         Console.WriteLine(caseReference + " : SovereignServiceArea not set using Lex ");
                         //TODO use subject then fullemail
-                        if(!caseDetails.Subject.ToLower().Contains("council form has been submitted"))
-                        {
-                            service = await GetServiceAsync(caseDetails.Subject,true);
+                        try {
+                            if (!caseDetails.Subject.ToLower().Contains("council form has been submitted"))
+                            {
+                                service = await GetServiceAsync(caseDetails.Subject, true);
+                            }
                         }
+                        catch(Exception) { }                     
                         if (service.Equals(""))
                         {
                             service = await GetServiceAsync(caseDetails.fullEmail,false);
