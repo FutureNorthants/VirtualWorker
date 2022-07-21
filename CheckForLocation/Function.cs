@@ -392,6 +392,7 @@ namespace CheckForLocation
                     caseDetails.sovereignServiceArea = GetStringValueFromJSON(caseSearch, "values.sovereign_service_area");
                     caseDetails.Redirected = GetBooleanValueFromJSON(caseSearch, "values.redirected");
                     caseDetails.fullEmail = RemoveSuppressionList(secrets.SuppressWording, GetStringValueFromJSON(caseSearch, "values.original_email"));
+                    caseDetails.customerContact = caseDetails.fullEmail;
                     if (caseReference.ToLower().Contains("emn"))
                     {
                         caseDetails.customerEmail = (String)caseSearch.SelectToken("values.email_1");
@@ -599,6 +600,8 @@ namespace CheckForLocation
                             }
                             else
                             {
+                                //TODO FAQ response here
+                                await GetProposedResponse(caseDetails);
                                 success = await SendEmails(caseDetails, forwardingEmailAddress, true);
                                 UpdateCaseString("email-comments", "Closing case");
                                 await TransitionCaseAsync("close-case");
@@ -1623,6 +1626,49 @@ namespace CheckForLocation
                 return await TransitionCaseAsync("hub-awaiting-review");
             }
         }
+        private async Task<Boolean> GetProposedResponse(CaseDetails caseDetails)
+        {
+            try
+            {
+                HttpClient qnaClient = new HttpClient();
+                qnaClient.DefaultRequestHeaders.Add("Authorization", secrets.QNAauth);
+                HttpResponseMessage responseMessage = await qnaClient.PostAsync(
+                     secrets.QNAurl,
+                     new StringContent("{'question':'" + HttpUtility.UrlEncode(caseDetails.customerContact) + "'}", Encoding.UTF8, "application/json"));
+                responseMessage.EnsureSuccessStatusCode();
+                string responseBody = await responseMessage.Content.ReadAsStringAsync();
+                dynamic jsonResponse = JObject.Parse(responseBody);
+                caseDetails.proposedResponse = jsonResponse.answers[0].answer;
+                int score = 0;
+                try
+                {
+                    if (Int32.TryParse(((String)(jsonResponse.answers[0].score)).Split('.')[0], out score))
+                    {
+                        caseDetails.proposedResponseConfidence = score;
+                    }
+                    else
+                    {
+                        await SendFailureAsync("qna Score not numeric : " + jsonResponse.answers[0].score, "QNA Error");
+                        Console.WriteLine("ERROR : qna Score not numeric : " + jsonResponse.answers[0].score);
+                        return false;
+                    }
+                }
+                catch (Exception error)
+                {
+                    await SendFailureAsync("qna Score Parse Error : " + jsonResponse.answers[0].score, error.Message);
+                    Console.WriteLine("ERROR : qna Score Parse Error : " + jsonResponse.answers[0].score + " : " + error.Message);
+                    return false;
+                }
+                UpdateCaseString("contact-response", caseDetails.proposedResponse);
+                return true;
+            }
+            catch (Exception error)
+            {
+                await SendFailureAsync("qna api error" , error.Message);
+                Console.WriteLine("qna api error", error.Message);
+                return false;
+            }
+        }
     }
 
 }
@@ -1641,12 +1687,15 @@ public class CaseDetails
     public String telephoneNumber { get; set; } = "";
     public String emailID { get; set; } = "";
     public String Subject { get; set; } = "";
+    public String customerContact { get; set; } = "";
+    public String proposedResponse { get; set; } = "";
     public Boolean customerHasUpdated { get; set; } = false;
     public Boolean manualReview { get; set; } = false;
     public Boolean contactUs { get; set; } = false;
     public Boolean District { get; set; } = false;
     public Boolean ConfirmationSent { get; set; } = false;
     public Boolean Redirected { get; set; } = false;
+    public int proposedResponseConfidence { get; set; } = 0;
 }
 
 public class Secrets
@@ -1702,6 +1751,8 @@ public class Secrets
     public String RedirectURI { get; set; }
     public String SubjectServiceMinConfidenceTest { get; set; }
     public String SubjectServiceMinConfidenceLive { get; set; }
+    public String QNAurl { get; set; }
+    public String QNAauth { get; set; }
 }
 
 public class Location
