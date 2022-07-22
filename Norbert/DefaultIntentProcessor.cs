@@ -12,24 +12,29 @@ public class DefaultIntentProcessor : AbstractIntentProcessor
 {
     public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context, IDictionary<String, String> requestAttributes, IDictionary<String, String> sessionAttributes, IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots)
     {
+        String[] responseMessages = {
+            getFAQResponseAsync(lexEvent.InputTranscript)
+        };
+
         try
         {
             return Close(
              "Default",
              "Fulfilled",
-             getFAQResponseAsync(lexEvent.InputTranscript),
+             responseMessages,
              requestAttributes,
              sessionAttributes
              );
         }
         catch(Exception error)
         {
-            if(error is not ApplicationException)
+            responseMessages[0] = "Please wait whilst we connect you to a member of staff to help with this query";
+            if (error is not ApplicationException)
             {
                 Console.WriteLine("Error : " + error.Message);
                 Console.WriteLine(error.StackTrace);
             }
-            return Close(lexEvent.Interpretations[0].Intent.Name, "Failed", "Please wait whilst we connect you to a member of staff to help with this query", requestAttributes, sessionAttributes);
+            return Close(lexEvent.Interpretations[0].Intent.Name, "Failed", responseMessages, requestAttributes, sessionAttributes);
         }
  
     }

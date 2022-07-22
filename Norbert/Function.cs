@@ -19,6 +19,9 @@ public class Function
     public LexV2Response FunctionHandler(LexEventV2 lexEvent, ILambdaContext context)
     {
         IIntentProcessor process;
+        IDictionary<String, String>? requestAttributes = null;
+        IDictionary<String, String>? sessionAttributes = null;
+        IDictionary<String, LexV2.LexIntentV2.LexSlotV2>? slots = null;
 
         try
         {
@@ -33,9 +36,13 @@ public class Function
         }
         catch(Exception) { }
 
-        IDictionary<String, String> requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
-        IDictionary<String, String> sessionAttributes = lexEvent.SessionState.SessionAttributes ?? new Dictionary<String, String>();
-        IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots = lexEvent.Interpretations[0].Intent.Slots;
+        try
+        {
+            requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
+            sessionAttributes = lexEvent.SessionState.SessionAttributes ?? new Dictionary<String, String>();
+            slots = lexEvent.Interpretations[0].Intent.Slots;
+        }
+        catch (Exception) { }
 
         try
         {
