@@ -294,8 +294,6 @@ public class LexResponseV2
 {
     [JsonPropertyName("sessionState")]
     public LexSessionStateV2 SessionState { get; set; }
-
-    // TODO: Refactor SessionState V2 to be shared with LexEventV2
     public class LexSessionStateV2
     {
         [JsonPropertyName("activeContexts")]
