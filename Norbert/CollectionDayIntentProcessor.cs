@@ -15,23 +15,29 @@ public class CollectionDayIntentProcessor : AbstractIntentProcessor
         try
         {
             LexV2.LexIntentV2.LexSlotValueV2 slotValue = slots["Postcode"].Value;
+            String[] responseMessages = {
+               getBinCollectionDetails(slotValue.InterpretedValue)
+            };
             return Close(
                         "Default",
                         "Fulfilled",
-                        getBinCollectionDetails(slotValue.InterpretedValue),
+                        responseMessages,
                         requestAttributes,
                         sessionAttributes
                     );
         }
         catch(ApplicationException error)
         {
+            String[] responseMessages = {
+               "Please wait whilst we connect you to a member of staff to help with this query"
+            };
             Console.WriteLine("Error : " + error.Message);
             Console.WriteLine(error.StackTrace);
-            return Close(lexEvent.Interpretations[0].Intent.Name, "Failed","Please wait whilst we connect you to a member of staff to help with this query",requestAttributes,sessionAttributes);
+            return Close(lexEvent.Interpretations[0].Intent.Name, "Failed", responseMessages, requestAttributes,sessionAttributes);
         }
         catch(Exception)
         {
-            return Delegate(lexEvent.ProposedNextState.Intent.Name,requestAttributes);
+            return Delegate(lexEvent.ProposedNextState.Intent.Name,requestAttributes, sessionAttributes);
         }      
     }
 
