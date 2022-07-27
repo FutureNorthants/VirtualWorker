@@ -11,7 +11,7 @@ using System.Text.Json;
 
 namespace Norbert;
 
-public class Function
+public class Function : AbstractIntentProcessor
 {
     private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
     private static readonly String secretName = "ChatBot";
@@ -31,10 +31,22 @@ public class Function
         IDictionary<String, String>? requestAttributes = null;
         IDictionary<String, String>? sessionAttributes = null;
         IDictionary<String, LexV2.LexIntentV2.LexSlotV2>? slots = null;
+       
 
         try
         {
             Secrets secrets = GetSecrets().Result;
+            String qnaAuth = secrets.qna_auth_test;
+            String qnaURL = secrets.qna_url_test;
+            try
+            {
+                if (context.InvokedFunctionArn.ToLower().Contains("prod"))
+                {
+                    qnaAuth = secrets.qna_auth_live;
+                    qnaURL = secrets.qna_url_live;
+                }
+            }
+            catch (Exception) { }
             try
             {
                 Console.WriteLine("------------");
@@ -50,9 +62,18 @@ public class Function
             }
             catch (Exception) { }
 
-            IDictionary<String, String> requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
-            IDictionary<String, String> sessionAttributes = lexEvent.SessionState.SessionAttributes ?? new Dictionary<String, String>();
-            IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots = lexEvent.Interpretations[0].Intent.Slots;
+            requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
+            sessionAttributes = lexEvent.SessionState.SessionAttributes ?? new Dictionary<String, String>();
+            slots = lexEvent.Interpretations[0].Intent.Slots;
+
+            try
+            {
+                requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
+                sessionAttributes = lexEvent.SessionState.SessionAttributes ?? new Dictionary<String, String>();
+                slots = lexEvent.Interpretations[0].Intent.Slots;
+            }
+            catch (Exception) { }
+
             try
             {
                 switch (lexEvent.Interpretations[0].Intent.Name.ToLower())
@@ -64,18 +85,19 @@ public class Function
                         process = new CollectionDayIntentProcessor();
                         break;
                     default:
-                        process = new DefaultIntentProcessor();
+                        process = new DefaultIntentProcessor(qnaAuth,qnaURL);
                         break;
                 }
             }
             catch (Exception)
             {
-                process = new DefaultIntentProcessor();
+                process = new DefaultIntentProcessor(qnaAuth, qnaURL);
             }
             return process.Process(lexEvent, context, sessionAttributes, requestAttributes, slots);
         }
         catch(Exception error) 
         {
+            return Handover(requestAttributes, sessionAttributes);
         }     
     }
 
@@ -83,19 +105,9 @@ public class Function
     {
         IAmazonSecretsManager client = new AmazonSecretsManagerClient(primaryRegion);
 
-<<<<<<< Updated upstream
-        try
-        {
-            requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
-            sessionAttributes = lexEvent.SessionState.SessionAttributes ?? new Dictionary<String, String>();
-            slots = lexEvent.Interpretations[0].Intent.Slots;
-        }
-        catch (Exception) { }
-=======
         GetSecretValueRequest request = new GetSecretValueRequest();
         request.SecretId = secretName;
         request.VersionStage = secretAlias;
->>>>>>> Stashed changes
 
         try
         {
@@ -114,6 +126,11 @@ public class Function
         {
             throw new ApplicationException("Error Getting Secrets", error);
         }
+    }
+
+    public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context, IDictionary<string, string> sessionAttributes, IDictionary<string, string> requestAttributes, IDictionary<string, LexV2.LexIntentV2.LexSlotV2> slots)
+    {
+        throw new NotImplementedException();
     }
 }
 public class Secrets
