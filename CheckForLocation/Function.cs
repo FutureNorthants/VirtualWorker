@@ -1659,13 +1659,74 @@ namespace CheckForLocation
                     Console.WriteLine("ERROR : qna Score Parse Error : " + jsonResponse.answers[0].score + " : " + error.Message);
                     return false;
                 }
-                UpdateCaseString("contact-response", caseDetails.proposedResponse);
+                if (!await UpdateCaseDetailsAsync(caseDetails))
+                {
+                    UpdateCaseString("contact-response", "invalid FAQ response");
+                }
                 return true;
             }
             catch (Exception error)
             {
                 await SendFailureAsync("qna api error" , error.Message);
                 Console.WriteLine("qna api error", error.Message);
+                return false;
+            }
+        }
+        private async Task<Boolean> UpdateCaseDetailsAsync(CaseDetails caseDetails)
+        {
+            HttpClient cxmClient = new HttpClient();
+            cxmClient.BaseAddress = new Uri(cxmEndPoint);
+            String uri = "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "/edit?key=" + cxmAPIKey;
+            Dictionary<string, string> cxmPayload;
+            //TODO replace with parameter 
+            if (caseDetails.proposedResponseConfidence < 0)
+            {
+                cxmPayload = new Dictionary<string, string>
+                {
+                    { "response-confidence", caseDetails.proposedResponseConfidence.ToString()}
+                };
+            }
+            else
+            {
+                //TODO secrets!
+                //TODO minAutoRespondLevel 
+                if (30 < caseDetails.proposedResponseConfidence)
+                //if (90 < caseDetails.proposedResponseConfidence)
+                {
+                    cxmPayload = new Dictionary<string, string>
+                    {
+                        { "contact-response", caseDetails.proposedResponse },
+                        { "response-confidence", caseDetails.proposedResponseConfidence.ToString()},
+                        { "new-case-status", "close"},
+                        { "staff-name", "Norbert"}
+                    };
+                }
+                else
+                {
+                    cxmPayload = new Dictionary<string, string>
+                    {
+                        { "contact-response", caseDetails.proposedResponse },
+                        { "response-confidence", caseDetails.proposedResponseConfidence.ToString()}
+                    };
+                }
+               // await StoreStringResponseToDynamoAsync(caseReference, "ProposedResponse", caseDetails.proposedResponse);
+                // await StoreNumericResponseToDynamoAsync(caseReference, "ProposedResponseConfidence", caseDetails.proposedResponseConfidence.ToString());
+            }
+
+            String json = JsonConvert.SerializeObject(cxmPayload, Formatting.Indented);
+            StringContent content = new StringContent(json);
+
+            HttpResponseMessage response = await cxmClient.PatchAsync(uri, content);
+
+            try
+            {
+                response.EnsureSuccessStatusCode();
+                return true;
+            }
+            catch (Exception error)
+            {
+                await SendFailureAsync(error.Message, "UpdateCaseDetailsAsync");
+                Console.WriteLine("ERROR : UpdateCaseDetailsAsync :  " + error.Message);
                 return false;
             }
         }
