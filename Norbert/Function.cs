@@ -5,9 +5,7 @@ using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
 using System.Text.Json;
 
-// Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
-//[assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]
 
 namespace Norbert;
 
@@ -16,14 +14,6 @@ public class Function : AbstractIntentProcessor
     private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
     private static readonly String secretName = "ChatBot";
     private static readonly String secretAlias = "AWSCURRENT";
-    //private Secrets? secrets = null;
-
-    /// <summary>
-    /// A simple function that takes a string and does a ToUpper
-    /// </summary>
-    /// <param name="input"></param>
-    /// <param name="context"></param>
-    /// <returns></returns>
     public LexV2Response FunctionHandler(LexEventV2 lexEvent, ILambdaContext context)
     {
        
@@ -36,22 +26,41 @@ public class Function : AbstractIntentProcessor
         try
         {
             Secrets secrets = GetSecrets().Result;
-            String qnaAuth = secrets.qna_auth_test;
-            String qnaURL = secrets.qna_url_test;
+            String qnaAuth = secrets.QnaAuthTest;
+            String qnaURL = secrets.QnaUrlTest;
+            String MinConfidenceLevel = secrets.MinConfidenceTest;
+            long MinConfidence = 0;
+
             try
             {
                 if (context.InvokedFunctionArn.ToLower().Contains("prod"))
                 {
-                    qnaAuth = secrets.qna_auth_live;
-                    qnaURL = secrets.qna_url_live;
+                    qnaAuth = secrets.QnaAuthLive;
+                    qnaURL = secrets.QnaUrlLive;
+                    MinConfidenceLevel = secrets.MinConfidenceLive;
                 }
             }
             catch (Exception) { }
+
+            try
+            {
+                if(long.TryParse(MinConfidenceLevel, out long tempConfidence))
+                {
+                    MinConfidence = tempConfidence;
+                }
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine("ERROR converting MinConfidenceLevel   : " + MinConfidenceLevel);
+                Console.WriteLine("ERROR : " + error.Message);
+                Console.WriteLine("ERROR : " + error.StackTrace);
+            }
+
             try
             {
                 Console.WriteLine("------------");
                 Console.WriteLine("Secrets     : ");
-                Console.WriteLine("Secret URL    : " + secrets.qna_url_test);
+                Console.WriteLine("Secret URL    : " + secrets.QnaUrlTest);
                 Console.WriteLine("Bot           : " + lexEvent.Bot.Name);
                 Console.WriteLine("Alias         : " + lexEvent.Bot.AliasId);
                 Console.WriteLine("Version       : " + lexEvent.Bot.Version);
@@ -85,13 +94,13 @@ public class Function : AbstractIntentProcessor
                         process = new CollectionDayIntentProcessor();
                         break;
                     default:
-                        process = new DefaultIntentProcessor(qnaAuth,qnaURL);
+                        process = new DefaultIntentProcessor(qnaAuth,qnaURL,MinConfidence);
                         break;
                 }
             }
             catch (Exception)
             {
-                process = new DefaultIntentProcessor(qnaAuth, qnaURL);
+                process = new DefaultIntentProcessor(qnaAuth, qnaURL, MinConfidence);
             }
             return process.Process(lexEvent, context, sessionAttributes, requestAttributes, slots);
         }
@@ -135,8 +144,10 @@ public class Function : AbstractIntentProcessor
 }
 public class Secrets
 {
-    public String? qna_auth_live { get; set; }
-    public String? qna_url_live { get; set; }
-    public String? qna_auth_test { get; set; }
-    public String? qna_url_test { get; set; }
+    public String? QnaAuthLive { get; set; }
+    public String? QnaUrlLive { get; set; }
+    public String? QnaAuthTest { get; set; }
+    public String? QnaUrlTest { get; set; }
+    public String MinConfidenceTest { get; set; } = string.Empty;
+    public String MinConfidenceLive { get; set; } = string.Empty;
 }
