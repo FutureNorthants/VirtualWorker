@@ -93,6 +93,15 @@ public class Function : AbstractIntentProcessor
                     case "collectionday":
                         process = new CollectionDayIntentProcessor();
                         break;
+                    case "handover":
+                        process = new HandoverIntentProcessor();
+                        break;
+                    //case "endchat":
+                    //    process = new EndChatIntentProcessor();
+                    //    break;
+                    case "stop":
+                        process = new StopIntentProcessor();
+                        break;
                     default:
                         process = new DefaultIntentProcessor(qnaAuth,qnaURL,MinConfidence);
                         break;

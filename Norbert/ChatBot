@@ -1,0 +1,600 @@
+{
+  "modules": [
+    {
+      "id": "44543055-67b5-4edb-be17-a2d5bf053047",
+      "type": "SetLoggingBehavior",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "3a7237c0-730b-4fb2-9a7d-db7f5c37a8ea"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "LoggingBehavior",
+          "value": "Enable"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 159,
+          "y": 127
+        }
+      }
+    },
+    {
+      "id": "3a7237c0-730b-4fb2-9a7d-db7f5c37a8ea",
+      "type": "DistributeByPercentage",
+      "branches": [
+        {
+          "condition": "Evaluate",
+          "conditionType": "Equals",
+          "conditionValue": "50",
+          "transition": "a7703bf7-4c66-4099-95e1-b6099314b5a1"
+        },
+        {
+          "conditionType": "Equals",
+          "conditionValue": "50",
+          "condition": "NoMatch",
+          "transition": "486bfa74-01b1-41d5-8780-d1b2ec7f8771"
+        }
+      ],
+      "parameters": [],
+      "metadata": {
+        "position": {
+          "x": 404,
+          "y": 191
+        },
+        "conditionMetadata": [
+          {
+            "id": "456acc32-096c-4e15-b825-65870d6ab74d",
+            "percent": {
+              "value": 1,
+              "display": "1%"
+            },
+            "name": "",
+            "value": "50"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ba3d1c7e-bcf3-4ca1-826a-f503162d9eda",
+      "type": "SetAttributes",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "55e67895-d946-4f4d-90d8-76fec75ea873"
+        },
+        {
+          "condition": "Error",
+          "transition": "8091c093-83a0-45a9-a50d-2c1b0151a03c"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Attribute",
+          "value": "female",
+          "key": "persona",
+          "namespace": null
+        },
+        {
+          "name": "Attribute",
+          "value": "initial",
+          "key": "greetingType",
+          "namespace": null
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 940,
+          "y": 15
+        },
+        "dynamicParams": []
+      }
+    },
+    {
+      "id": "a7703bf7-4c66-4099-95e1-b6099314b5a1",
+      "type": "SetVoice",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "a3c85efa-4d95-4421-87b4-dd3a035bcc49"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "GlobalVoice",
+          "value": "Emma"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 676,
+          "y": 77
+        },
+        "overrideConsoleVoice": false,
+        "defaultVoice": "None",
+        "fragments": { "SetContactData": "a3c85efa-4d95-4421-87b4-dd3a035bcc49" }
+      }
+    },
+    {
+      "id": "a3c85efa-4d95-4421-87b4-dd3a035bcc49",
+      "type": "SetContactData",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "ba3d1c7e-bcf3-4ca1-826a-f503162d9eda"
+        },
+        {
+          "condition": "Error",
+          "transition": "ba3d1c7e-bcf3-4ca1-826a-f503162d9eda"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "ContactData",
+          "namespace": null,
+          "languageCode": "en-GB"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "74bcbe7f-1f8e-473d-8dc1-b0c4e1ba6ab8",
+      "type": "SetAttributes",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "55e67895-d946-4f4d-90d8-76fec75ea873"
+        },
+        {
+          "condition": "Error",
+          "transition": "8091c093-83a0-45a9-a50d-2c1b0151a03c"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Attribute",
+          "value": "continue",
+          "key": "greetingType",
+          "namespace": null
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 1703,
+          "y": 454
+        },
+        "dynamicParams": []
+      }
+    },
+    {
+      "id": "2fad7490-21b5-4fdc-b234-3bdcf02b16ed",
+      "type": "SetQueue",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "0738b212-3e43-4e94-a65e-e1f6d259c9c1"
+        },
+        {
+          "condition": "Error",
+          "transition": "21d9306a-e098-46fa-8d8b-21dbbf38c1fc"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Queue",
+          "value": "arn:aws:connect:eu-west-2:609845412203:instance/4b552839-667b-4287-80a9-c586ec1d5691/queue/9b132bd3-6a9f-4b51-a523-7f9382c099e5",
+          "namespace": null,
+          "resourceName": "BasicQueue"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 2170,
+          "y": 505
+        },
+        "useDynamic": false,
+        "queue": {
+          "id": "arn:aws:connect:eu-west-2:609845412203:instance/4b552839-667b-4287-80a9-c586ec1d5691/queue/9b132bd3-6a9f-4b51-a523-7f9382c099e5",
+          "text": "BasicQueue"
+        }
+      }
+    },
+    {
+      "id": "0738b212-3e43-4e94-a65e-e1f6d259c9c1",
+      "type": "Transfer",
+      "branches": [
+        {
+          "condition": "AtCapacity",
+          "transition": "95bd7b4a-e33d-492a-99bd-ca4b3a2d6243"
+        },
+        {
+          "condition": "Error",
+          "transition": "95bd7b4a-e33d-492a-99bd-ca4b3a2d6243"
+        }
+      ],
+      "parameters": [],
+      "metadata": {
+        "position": {
+          "x": 2400,
+          "y": 505
+        },
+        "useDynamic": false,
+        "queue": null
+      },
+      "target": "Queue"
+    },
+    {
+      "id": "31ca4065-2564-4c6a-9e69-5af5d4ca782f",
+      "type": "GetUserInput",
+      "branches": [
+        {
+          "condition": "Evaluate",
+          "conditionType": "Equals",
+          "conditionValue": "Debug",
+          "transition": "74bcbe7f-1f8e-473d-8dc1-b0c4e1ba6ab8"
+        },
+        {
+          "condition": "Evaluate",
+          "conditionType": "Equals",
+          "conditionValue": "Handover",
+          "transition": "475a38d1-9b36-42c9-997a-f277da431869"
+        },
+        {
+          "condition": "Evaluate",
+          "conditionType": "Equals",
+          "conditionValue": "Stop",
+          "transition": "95bd7b4a-e33d-492a-99bd-ca4b3a2d6243"
+        },
+        {
+          "condition": "Evaluate",
+          "conditionType": "Equals",
+          "conditionValue": "EndChat",
+          "transition": "95bd7b4a-e33d-492a-99bd-ca4b3a2d6243"
+        },
+        {
+          "condition": "NoMatch",
+          "transition": "74bcbe7f-1f8e-473d-8dc1-b0c4e1ba6ab8"
+        },
+        {
+          "condition": "Error",
+          "transition": "8091c093-83a0-45a9-a50d-2c1b0151a03c"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Text",
+          "value": "Greeting",
+          "namespace": "External"
+        },
+        {
+          "name": "TextToSpeechType",
+          "value": "text"
+        },
+        {
+          "name": "BotAliasArn",
+          "value": "arn:aws:lex:eu-west-2:609845412203:bot-alias/PMDQJRSVHQ/2MHLSHSVLK",
+          "namespace": null
+        },
+        {
+          "name": "LexVersion",
+          "value": "V2"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 1441,
+          "y": 127
+        },
+        "conditionMetadata": [
+          {
+            "id": "e1c11e0e-f126-4844-9d84-e9d808ac916b",
+            "value": "Debug"
+          },
+          {
+            "id": "e3071242-3838-4274-a9f8-5f2ab108fe7f",
+            "value": "Handover"
+          },
+          {
+            "id": "e31950be-2102-4e3b-8d5a-7525679fa2c3",
+            "value": "Stop"
+          },
+          {
+            "id": "d7225e70-9a1d-47b2-9eab-75fb69b6b520",
+            "value": "EndChat"
+          }
+        ],
+        "useDynamic": true,
+        "dynamicMetadata": {},
+        "useLexBotDropdown": true,
+        "useDynamicLexBotArn": false,
+        "lexV2BotName": "Norbert",
+        "lexV2BotAliasName": "prod"
+      },
+      "target": "Lex"
+    },
+    {
+      "id": "475a38d1-9b36-42c9-997a-f277da431869",
+      "type": "CheckAttribute",
+      "branches": [
+        {
+          "condition": "NoMatch",
+          "transition": "8091c093-83a0-45a9-a50d-2c1b0151a03c"
+        },
+        {
+          "condition": "Evaluate",
+          "conditionType": "Equals",
+          "conditionValue": "EndChat",
+          "transition": "95bd7b4a-e33d-492a-99bd-ca4b3a2d6243"
+        },
+        {
+          "condition": "Evaluate",
+          "conditionType": "Equals",
+          "conditionValue": "WebChat",
+          "transition": "2fad7490-21b5-4fdc-b234-3bdcf02b16ed"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Attribute",
+          "value": "HandOverTo"
+        },
+        {
+          "name": "Namespace",
+          "value": "Lex.SessionAttributes"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 1697,
+          "y": 130
+        },
+        "conditionMetadata": [
+          {
+            "id": "cba849f6-b8c5-45dd-b644-2f3523a7d1f8",
+            "operator": {
+              "name": "Equals",
+              "value": "Equals",
+              "shortDisplay": "="
+            },
+            "value": "EndChat"
+          },
+          {
+            "id": "52c0c6e7-0658-418e-a9a4-65d4ee71a121",
+            "operator": {
+              "name": "Equals",
+              "value": "Equals",
+              "shortDisplay": "="
+            },
+            "value": "WebChat"
+          }
+        ]
+      }
+    },
+    {
+      "id": "21d9306a-e098-46fa-8d8b-21dbbf38c1fc",
+      "type": "PlayPrompt",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "95bd7b4a-e33d-492a-99bd-ca4b3a2d6243"
+        },
+        {
+          "condition": "Error",
+          "transition": "95bd7b4a-e33d-492a-99bd-ca4b3a2d6243"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Text",
+          "value": "Apologies, I am unable to transfer you to a colleague. Please try again later whilst we work to resolve this issue.",
+          "namespace": null
+        },
+        {
+          "name": "TextToSpeechType",
+          "value": "text"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 2400.666748046875,
+          "y": 710
+        },
+        "useDynamic": false
+      }
+    },
+    {
+      "id": "95bd7b4a-e33d-492a-99bd-ca4b3a2d6243",
+      "type": "Disconnect",
+      "branches": [],
+      "parameters": [],
+      "metadata": {
+        "position": {
+          "x": 2690,
+          "y": 425
+        }
+      }
+    },
+    {
+      "id": "55e67895-d946-4f4d-90d8-76fec75ea873",
+      "type": "InvokeExternalResource",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "31ca4065-2564-4c6a-9e69-5af5d4ca782f"
+        },
+        {
+          "condition": "Error",
+          "transition": "8091c093-83a0-45a9-a50d-2c1b0151a03c"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "FunctionArn",
+          "value": "arn:aws:lambda:eu-west-2:609845412203:function:GetGreeting:Prod",
+          "namespace": null
+        },
+        {
+          "name": "TimeLimit",
+          "value": "3"
+        },
+        {
+          "name": "Parameter",
+          "key": "persona",
+          "value": "persona",
+          "namespace": "User Defined"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 1179,
+          "y": 159
+        },
+        "dynamicMetadata": { "persona": true },
+        "useDynamic": false
+      },
+      "target": "Lambda"
+    },
+    {
+      "id": "8091c093-83a0-45a9-a50d-2c1b0151a03c",
+      "type": "PlayPrompt",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "2fad7490-21b5-4fdc-b234-3bdcf02b16ed"
+        },
+        {
+          "condition": "Error",
+          "transition": "21d9306a-e098-46fa-8d8b-21dbbf38c1fc"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Text",
+          "value": "Sorry, I'm having technical issues at the moment. Please wait whilst we connect you to one of my colleagues",
+          "namespace": null
+        },
+        {
+          "name": "TextToSpeechType",
+          "value": "text"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 1950,
+          "y": 506
+        },
+        "useDynamic": false
+      }
+    },
+    {
+      "id": "486bfa74-01b1-41d5-8780-d1b2ec7f8771",
+      "type": "SetVoice",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "cee8ddbd-0d2c-49a0-9fd3-6c6a7be5facd"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "GlobalVoice",
+          "value": "Brian"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 681,
+          "y": 265
+        },
+        "overrideConsoleVoice": false,
+        "defaultVoice": "None",
+        "fragments": { "SetContactData": "cee8ddbd-0d2c-49a0-9fd3-6c6a7be5facd" }
+      }
+    },
+    {
+      "id": "cee8ddbd-0d2c-49a0-9fd3-6c6a7be5facd",
+      "type": "SetContactData",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "34d7acc7-5520-405a-b4bc-a369f0c1936e"
+        },
+        {
+          "condition": "Error",
+          "transition": "34d7acc7-5520-405a-b4bc-a369f0c1936e"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "ContactData",
+          "namespace": null,
+          "languageCode": "en-GB"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "34d7acc7-5520-405a-b4bc-a369f0c1936e",
+      "type": "SetAttributes",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "55e67895-d946-4f4d-90d8-76fec75ea873"
+        },
+        {
+          "condition": "Error",
+          "transition": "8091c093-83a0-45a9-a50d-2c1b0151a03c"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Attribute",
+          "value": "male",
+          "key": "persona",
+          "namespace": null
+        },
+        {
+          "name": "Attribute",
+          "value": "initial",
+          "key": "greetingType",
+          "namespace": null
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 942,
+          "y": 228
+        },
+        "dynamicParams": []
+      }
+    }
+  ],
+  "version": "1",
+  "start": "44543055-67b5-4edb-be17-a2d5bf053047",
+  "metadata": {
+    "entryPointPosition": {
+      "x": 15,
+      "y": 91
+    },
+    "snapToGrid": false,
+    "name": "ChatBot",
+    "description": "Initiate chat via Bot",
+    "type": "contactFlow",
+    "status": "published",
+    "hash": "043d6a2e093723ea5c07ccfcbedd67265330ee3ffbdb065b3aa74e8669553c0f"
+  },
+  "type": "contactFlow"
+}

@@ -166,17 +166,17 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
         Element[] elements = new Element[4];
         elements[0] = new()
         {
-            title = "No Thanks, I'm good",
-            subtitle = "Nope",
+            title = "End Chat",
+            subtitle = " ",
             imageType = "URL",
             imageData = "https://wnclogo.s3.eu-west-2.amazonaws.com/thumb-down-basic-symbol-outline.png",
-            imageDescription = "Thumbs Down"
+            imageDescription = "End Chat"
         };
 
         elements[1] = new()
         {
-            title = "I want to leave a message",
-            subtitle = "Message",
+            title = "Leave a message",
+            subtitle = " ",
             imageType = "URL",
             imageData = "https://wnclogo.s3.eu-west-2.amazonaws.com/message.png",
             imageDescription = "Leave a message"
@@ -184,8 +184,8 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
 
         elements[2] = new()
         {
-            title = "I want a callback",
-            subtitle = "Callback",
+            title = "Request a callback",
+            subtitle = " ",
             imageType = "URL",
             imageData = "https://wnclogo.s3.eu-west-2.amazonaws.com/incoming-call.png",
             imageDescription = "Request a callback"
@@ -193,17 +193,17 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
 
         elements[3] = new()
         {
-            title = "I want to chat with a real person",
-            subtitle = "Handover to staff",
+            title = "Chat with a real person",
+            subtitle = " ",
             imageType = "URL",
             imageData = "https://wnclogo.s3.eu-west-2.amazonaws.com/hi-face-speech-bubble.png",
-            imageDescription = "Request a callback"
+            imageDescription = "Chat with a real person"
         };
 
         Content content = new()
         {
             title = "Sorry, but I'm not able to resolve your query myself. What would you like to do?",
-            subtitle = "Tap to select option",
+            subtitle = "Please select option",
             imageType = "URL",
             imageData = "https://wnclogo.s3.eu-west-2.amazonaws.com/Oops.jpg",
             imageDescription = "Select an option",
@@ -229,8 +229,6 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
         {
             data = data,
         };
-
-        //return listPicker;
 
         return Ellicit("Handover", "HandoverSelection", requestAttributes, sessionAttributes, "CustomPayload", JsonSerializer.Serialize(listPicker));
     }
