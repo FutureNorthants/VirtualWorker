@@ -4,12 +4,12 @@ using System.Text.Json;
 
 namespace Norbert;
 
-public class EndChatIntentProcessor : AbstractIntentProcessor
+public class LeaveAMessageIntentProcessor : AbstractIntentProcessor
 {
     public override LexV2Response Process(LexEventV2 lexEvent, ILambdaContext context, IDictionary<String, String> requestAttributes, IDictionary<String, String> sessionAttributes, IDictionary<String, LexV2.LexIntentV2.LexSlotV2> slots)
     {
         Console.WriteLine(" ");
-        Console.WriteLine("EndChatIntentProcessor Started");
+        Console.WriteLine("LeaveAMessageIntentProcessor Started");
         String instance = "Beta";
         try
         {
@@ -21,12 +21,12 @@ public class EndChatIntentProcessor : AbstractIntentProcessor
         catch (Exception){}
 
         String[] responseMessages = {
-            "Laters, dude"
+            "Write me a letter"
         };
-        Console.WriteLine("EndChatIntentProcessor Ended");
+        Console.WriteLine("LeaveAMessageIntentProcessor Ended");
 
         return Close(
-                    "EndChat",
+                    "LeaveAMessage",
                     "Fulfilled",
                     responseMessages,
                     requestAttributes,

@@ -96,9 +96,9 @@ public class Function : AbstractIntentProcessor
                     case "handover":
                         process = new HandoverIntentProcessor();
                         break;
-                    //case "endchat":
-                    //    process = new EndChatIntentProcessor();
-                    //    break;
+                    case "leaveamessage":
+                        process = new LeaveAMessageIntentProcessor();
+                        break;
                     case "stop":
                         process = new StopIntentProcessor();
                         break;

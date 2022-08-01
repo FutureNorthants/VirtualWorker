@@ -25,6 +25,8 @@ public class HandoverIntentProcessor : AbstractIntentProcessor
                 responseMessages = RealPersonMessages;
                 sessionAttributes.Add("HandOverTo", "WebChat");
                 return Close("Handover","Fulfilled", responseMessages, requestAttributes, sessionAttributes);
+            case "Leave a message":
+                return Ellicit("LeaveAMessage", "CustomerEmail", requestAttributes, sessionAttributes, "PlainText", "Please provide an email address for us to respond to");
             default:
                 String[] DefaultMessages = { "Handover has finished" };
                 responseMessages = DefaultMessages;
