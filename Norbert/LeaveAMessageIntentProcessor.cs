@@ -10,27 +10,41 @@ public class LeaveAMessageIntentProcessor : AbstractIntentProcessor
     {
         Console.WriteLine(" ");
         Console.WriteLine("LeaveAMessageIntentProcessor Started");
-        String instance = "Beta";
-        try
+
+        switch (lexEvent.InvocationSource)
         {
-            if (context.InvokedFunctionArn.ToLower().Contains("prod"))
-            {
-                instance = " Prod";
-            }
+            case "DialogCodeHook":
+                Console.WriteLine("DialogCodeHook");
+                return Delegate("LeaveAMessage",
+                                requestAttributes,
+                                sessionAttributes
+                                );
+            case "FulfillmentCodeHook":
+                Console.WriteLine("FulfillmentCodeHook");
+                String[] responseMessages = { "Write me a letter" };             
+                return Close("LeaveAMessage",
+                             "Fulfilled",
+                             responseMessages,
+                             requestAttributes,
+                             sessionAttributes
+                             );
+            default:
+                Console.WriteLine("ERROR Unknown InvocationSource : " + lexEvent.InvocationSource);
+                return Delegate("LeaveAMessage",
+                                requestAttributes,
+                                sessionAttributes
+                                );
         }
-        catch (Exception){}
-
-        String[] responseMessages = {
-            "Write me a letter"
-        };
         Console.WriteLine("LeaveAMessageIntentProcessor Ended");
+    }
 
-        return Close(
-                    "LeaveAMessage",
-                    "Fulfilled",
-                    responseMessages,
-                    requestAttributes,
-                    sessionAttributes
-                );
+    private static void ValidateMessage()
+    {
+
+    }
+
+    private static void CreateCase()
+    {
+
     }
 }

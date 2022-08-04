@@ -68,6 +68,7 @@ public class Function : AbstractIntentProcessor
                 Console.WriteLine("Transcription : " + lexEvent.InputTranscript);
                 Console.WriteLine("Source        : " + lexEvent.InvocationSource);
                 Console.WriteLine("Next Type     : " + lexEvent.ProposedNextState.DialogAction.Type);
+                Console.WriteLine("slotToElicit  : " + lexEvent.ProposedNextState.DialogAction.SlotToElicit);
             }
             catch (Exception) { }
 
