@@ -1,6 +1,7 @@
 using Amazon.Lambda.Core;
 using Amazon.Lambda.LexV2Events;
 using System.Text.Json;
+using static Norbert.LexResponseV2;
 
 namespace Norbert;
 
@@ -126,6 +127,28 @@ public abstract class AbstractIntentProcessor : IIntentProcessor
             SessionState = sessionState,
             RequestAttributes = requestAttributes
         };
+    }
+
+    protected LexV2Response Delegate2(LexEventV2 lexEvent)
+    {
+        Console.WriteLine("Delegating2");
+        JsonSerializerOptions options = new JsonSerializerOptions { WriteIndented = true };
+        String jsonString = JsonSerializer.Serialize(lexEvent.SessionState);
+
+        LexV2SessionState? sessionState = JsonSerializer.Deserialize<LexV2SessionState>(jsonString);
+        sessionState.DialogAction = new LexV2DialogAction
+        {
+            Type = "Delegate"
+        };
+
+        LexV2Response response = new LexV2Response
+        {
+            SessionState = sessionState
+        };
+
+        Console.WriteLine("Response as JSON : " + JsonSerializer.Serialize(response));
+
+        return response;
     }
 
     protected LexV2Response Ellicit(String intent, String slotName, IDictionary<String, String> requestAttributes, IDictionary<String, String> sessionAttributes, String messageContentType, String message)

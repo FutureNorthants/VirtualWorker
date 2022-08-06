@@ -58,6 +58,15 @@ public class Function : AbstractIntentProcessor
 
             try
             {
+                requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
+                sessionAttributes = lexEvent.SessionState.SessionAttributes ?? new Dictionary<String, String>();
+                slots = lexEvent.Interpretations[0].Intent.Slots;
+            }
+            catch (Exception) { }
+
+            try
+            {
+                string jsonString = JsonSerializer.Serialize(lexEvent);
                 Console.WriteLine("------------");
                 Console.WriteLine("Secrets     : ");
                 Console.WriteLine("Secret URL    : " + secrets.QnaUrlTest);
@@ -69,12 +78,19 @@ public class Function : AbstractIntentProcessor
                 Console.WriteLine("Source        : " + lexEvent.InvocationSource);
                 Console.WriteLine("Next Type     : " + lexEvent.ProposedNextState.DialogAction.Type);
                 Console.WriteLine("slotToElicit  : " + lexEvent.ProposedNextState.DialogAction.SlotToElicit);
+                Console.WriteLine("Event as JSON : " + jsonString);
+                Console.WriteLine("Displaying Request Attributes :" + lexEvent.RequestAttributes.Count);
+                foreach (KeyValuePair<String, String> item in requestAttributes)
+                {
+                    Console.Write(item.Key + "=>" + item.Value.ToString());
+                }
+                Console.WriteLine("Displaying Session Attributes :" + lexEvent.SessionState.SessionAttributes.Count);
+                foreach (KeyValuePair<String, String> item in sessionAttributes)
+                {
+                    Console.Write(item.Key + "=>" + item.Value.ToString());
+                }
             }
             catch (Exception) { }
-
-            requestAttributes = lexEvent.RequestAttributes ?? new Dictionary<String, String>();
-            sessionAttributes = lexEvent.SessionState.SessionAttributes ?? new Dictionary<String, String>();
-            slots = lexEvent.Interpretations[0].Intent.Slots;
 
             try
             {
@@ -112,10 +128,13 @@ public class Function : AbstractIntentProcessor
             {
                 process = new DefaultIntentProcessor(qnaAuth, qnaURL, MinConfidence);
             }
-            return process.Process(lexEvent, context, sessionAttributes, requestAttributes, slots);
+            //return process.Process(lexEvent, context, sessionAttributes, requestAttributes, slots);
+            return process.Process(lexEvent, context, requestAttributes, sessionAttributes, slots);
         }
         catch(Exception error) 
         {
+            Console.WriteLine("ERROR : " + error.Message);
+            Console.WriteLine("ERROR : " + error.StackTrace);
             return Handover(requestAttributes, sessionAttributes);
         }     
     }

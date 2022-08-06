@@ -1,6 +1,7 @@
 using Amazon.Lambda.Core;
 using Amazon.Lambda.LexV2Events;
 using System.Text.Json;
+using static Norbert.LexV2.LexIntentV2;
 
 namespace Norbert;
 
@@ -15,13 +16,40 @@ public class LeaveAMessageIntentProcessor : AbstractIntentProcessor
         {
             case "DialogCodeHook":
                 Console.WriteLine("DialogCodeHook");
-                return Delegate("LeaveAMessage",
-                                requestAttributes,
-                                sessionAttributes
-                                );
+                lexEvent.SessionState.Intent.Slots.TryGetValue("CustomerEmail", out LexSlotV2 customerEmail);
+                try
+                {
+                    if (lexEvent.ProposedNextState.DialogAction.SlotToElicit.ToLower().Equals("message") && 
+                        !customerEmail.Value.ResolvedValues[0].Equals(lexEvent.InputTranscript))
+                    {
+                        String[] responseMessages1 = { "Write me a letter3" };
+                        return Close("LeaveAMessage",
+                             "Fulfilled",
+                             responseMessages1,
+                             requestAttributes,
+                             sessionAttributes
+                             );
+                    }
+                    else
+                    {                       
+                        return Delegate2(lexEvent);
+                    }
+                }
+                catch (Exception)
+                {
+                    String[] responseMessages2 = { "Write me a letter2" };
+                    return Close("LeaveAMessage",
+                             "Fulfilled",
+                             responseMessages2,
+                             requestAttributes,
+                             sessionAttributes
+                             );
+                }
+                
+                
             case "FulfillmentCodeHook":
                 Console.WriteLine("FulfillmentCodeHook");
-                String[] responseMessages = { "Write me a letter" };             
+                String[] responseMessages = { "Write me a letter1" };             
                 return Close("LeaveAMessage",
                              "Fulfilled",
                              responseMessages,
