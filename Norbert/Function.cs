@@ -26,9 +26,13 @@ public class Function : AbstractIntentProcessor
         try
         {
             Secrets secrets = GetSecrets().Result;
-            String qnaAuth = secrets.QnaAuthTest;
-            String qnaURL = secrets.QnaUrlTest;
-            String MinConfidenceLevel = secrets.MinConfidenceTest;
+            String? qnaAuth = secrets.QnaAuthTest;
+            String? qnaURL = secrets.QnaUrlTest;
+            String? MinConfidenceLevel = secrets.MinConfidenceTest;
+            String? cxmEndPoint = secrets.CxmEndPointTest;
+            String? cxmAPIKey = secrets.CxmAPIKeyTest;
+            String? cxmAPIName = secrets.CxmAPINameTest;
+            String? cxmAPICaseType = secrets.CxmAPICaseTypeTest;
             long MinConfidence = 0;
 
             try
@@ -38,6 +42,10 @@ public class Function : AbstractIntentProcessor
                     qnaAuth = secrets.QnaAuthLive;
                     qnaURL = secrets.QnaUrlLive;
                     MinConfidenceLevel = secrets.MinConfidenceLive;
+                    cxmEndPoint = secrets.CxmEndPointLive;
+                    cxmAPIKey = secrets.CxmAPIKeyLive;
+                    cxmAPIName = secrets.CxmAPINameLive;
+                    cxmAPICaseType = secrets.CxmAPICaseTypeLive;
                 }
             }
             catch (Exception) { }
@@ -114,7 +122,7 @@ public class Function : AbstractIntentProcessor
                         process = new HandoverIntentProcessor();
                         break;
                     case "leaveamessage":
-                        process = new LeaveAMessageIntentProcessor();
+                        process = new LeaveAMessageIntentProcessor(cxmEndPoint,cxmAPIKey,cxmAPIName,cxmAPICaseType);
                         break;
                     case "stop":
                         process = new StopIntentProcessor();
@@ -128,7 +136,6 @@ public class Function : AbstractIntentProcessor
             {
                 process = new DefaultIntentProcessor(qnaAuth, qnaURL, MinConfidence);
             }
-            //return process.Process(lexEvent, context, sessionAttributes, requestAttributes, slots);
             return process.Process(lexEvent, context, requestAttributes, sessionAttributes, slots);
         }
         catch(Exception error) 
@@ -177,6 +184,14 @@ public class Secrets
     public String? QnaUrlLive { get; set; }
     public String? QnaAuthTest { get; set; }
     public String? QnaUrlTest { get; set; }
-    public String MinConfidenceTest { get; set; } = string.Empty;
-    public String MinConfidenceLive { get; set; } = string.Empty;
+    public String? MinConfidenceTest { get; set; } = string.Empty;
+    public String? MinConfidenceLive { get; set; } = string.Empty;
+    public String? CxmEndPointTest { get; set; }
+    public String? CxmEndPointLive { get; set; }
+    public String? CxmAPIKeyTest { get; set; }
+    public String? CxmAPIKeyLive { get; set; }
+    public String? CxmAPINameTest { get; set; }
+    public String? CxmAPINameLive { get; set; }
+    public String? CxmAPICaseTypeLive { get; set; }
+    public String? CxmAPICaseTypeTest { get; set; }
 }
