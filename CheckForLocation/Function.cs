@@ -602,9 +602,18 @@ namespace CheckForLocation
                             {
                                 //TODO FAQ response here
                                 await GetProposedResponse(caseDetails);
-                                success = await SendEmails(caseDetails, forwardingEmailAddress, true);
-                                UpdateCaseString("email-comments", "Closing case");
-                                await TransitionCaseAsync("close-case");
+                                //TODO Parameterise
+                                if (30 < caseDetails.proposedResponseConfidence)
+                                {
+                                    UpdateCaseString("email-comments", "Automated Response");
+                                    await TransitionCaseAsync("automated-response");
+                                }
+                                else
+                                {
+                                    success = await SendEmails(caseDetails, forwardingEmailAddress, true);
+                                    UpdateCaseString("email-comments", "Closing case");
+                                    await TransitionCaseAsync("close-case");
+                                }                                 
                             }
                         }
                     }
