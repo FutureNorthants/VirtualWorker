@@ -73,6 +73,9 @@ namespace CheckForLocation
         private Location sovereignLocation;
         readonly MemoryStream memoryStream = new MemoryStream();
 
+        private static int minConfidenceLevel;
+        private static int minAutoRespondLevel;
+
         public async Task FunctionHandler(object input, ILambdaContext context)
         {
             if (await GetSecrets())
@@ -94,6 +97,34 @@ namespace CheckForLocation
                 JObject inputJSON = JObject.Parse(input.ToString());
                 caseReference = (String)inputJSON.SelectToken("CaseReference");
                 taskToken = (String)inputJSON.SelectToken("TaskToken");
+
+                try
+                {
+                    if (!Int32.TryParse(secrets.minResponseConfidenceLevel, out minConfidenceLevel))
+                    {
+                        await SendFailureAsync("minConfidenceLevel not numeric : " + secrets.minResponseConfidenceLevel, "Secrets Error");
+                        Console.WriteLine("ERROR : minConfidenceLevel not numeric : " + secrets.minResponseConfidenceLevel);
+                    }
+                }
+                catch (Exception error)
+                {
+                    await SendFailureAsync("minConfidenceLevel Parse Error : " + secrets.minResponseConfidenceLevel, error.Message);
+                    Console.WriteLine("ERROR : minConfidenceLevel Parse Error : " + secrets.minResponseConfidenceLevel + " : " + error.Message);
+                }
+
+                try
+                {
+                    if (!Int32.TryParse(secrets.minAutoResponseLevel, out minAutoRespondLevel))
+                    {
+                        await SendFailureAsync("minAutoRespondLevel not numeric : " + secrets.minAutoResponseLevel, "Lambda Parameter Error");
+                        Console.WriteLine("ERROR : minAutoRespondLevel not numeric : " + secrets.minAutoResponseLevel);
+                    }
+                }
+                catch (Exception error)
+                {
+                    await SendFailureAsync("minAutoRespondLevel Parse Error : " + secrets.minAutoResponseLevel, error.Message);
+                    Console.WriteLine("ERROR : minAutoRespondLevel Parse Error : " + secrets.minAutoResponseLevel + " : " + error.Message);
+                }
 
                 Random randonNumber = new Random();
                 if (randonNumber.Next(0, 2) == 0)
@@ -526,7 +557,6 @@ namespace CheckForLocation
                     else
                     {
                         Console.WriteLine(caseReference + " : SovereignServiceArea not set using Lex ");
-                        //TODO use subject then fullemail
                         try {
                             if (!caseDetails.Subject.ToLower().Contains("council form has been submitted"))
                             {
@@ -600,10 +630,9 @@ namespace CheckForLocation
                             }
                             else
                             {
-                                //TODO FAQ response here
                                 await GetProposedResponse(caseDetails);
                                 //TODO Parameterise
-                                if (30 < caseDetails.proposedResponseConfidence)
+                                if (minAutoRespondLevel < caseDetails.proposedResponseConfidence)
                                 {
                                     UpdateCaseString("email-comments", "Automated Response");
                                     await TransitionCaseAsync("automated-response");
@@ -1688,7 +1717,7 @@ namespace CheckForLocation
             String uri = "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "/edit?key=" + cxmAPIKey;
             Dictionary<string, string> cxmPayload;
             //TODO replace with parameter 
-            if (caseDetails.proposedResponseConfidence < 0)
+            if (caseDetails.proposedResponseConfidence < minConfidenceLevel)
             {
                 cxmPayload = new Dictionary<string, string>
                 {
@@ -1697,10 +1726,8 @@ namespace CheckForLocation
             }
             else
             {
-                //TODO secrets!
                 //TODO minAutoRespondLevel 
-                if (30 < caseDetails.proposedResponseConfidence)
-                //if (90 < caseDetails.proposedResponseConfidence)
+                if (minAutoRespondLevel < caseDetails.proposedResponseConfidence)
                 {
                     cxmPayload = new Dictionary<string, string>
                     {
@@ -1718,8 +1745,6 @@ namespace CheckForLocation
                         { "response-confidence", caseDetails.proposedResponseConfidence.ToString()}
                     };
                 }
-               // await StoreStringResponseToDynamoAsync(caseReference, "ProposedResponse", caseDetails.proposedResponse);
-                // await StoreNumericResponseToDynamoAsync(caseReference, "ProposedResponseConfidence", caseDetails.proposedResponseConfidence.ToString());
             }
 
             String json = JsonConvert.SerializeObject(cxmPayload, Formatting.Indented);
@@ -1823,6 +1848,8 @@ public class Secrets
     public String SubjectServiceMinConfidenceLive { get; set; }
     public String QNAurl { get; set; }
     public String QNAauth { get; set; }
+    public String minAutoResponseLevel { get; set; }
+    public String minResponseConfidenceLevel { get; set; }
 }
 
 public class Location
