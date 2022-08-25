@@ -16,6 +16,7 @@ using MimeKit;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -631,8 +632,7 @@ namespace CheckForLocation
                             else
                             {
                                 await GetProposedResponse(caseDetails);
-                                //TODO Parameterise
-                                if (minAutoRespondLevel < caseDetails.proposedResponseConfidence)
+                                if(caseDetails.proposedResponseConfidence > minAutoRespondLevel)
                                 {
                                     UpdateCaseString("email-comments", "Automated Response");
                                     await TransitionCaseAsync("automated-response");
@@ -1676,7 +1676,25 @@ namespace CheckForLocation
                 responseMessage.EnsureSuccessStatusCode();
                 string responseBody = await responseMessage.Content.ReadAsStringAsync();
                 dynamic jsonResponse = JObject.Parse(responseBody);
-                caseDetails.proposedResponse = jsonResponse.answers[0].answer;
+                QNAResponse qnaResponse = System.Text.Json.JsonSerializer.Deserialize<QNAResponse>(responseBody);
+ 
+                switch (caseDetails.sovereignCouncil.ToLower())
+                {
+                    case "northampton":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "NBC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "daventry":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "DDC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "south_northants":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "SNC", qnaResponse.answers[0].metadata);
+                        break;
+                    default:
+                        await SendFailureAsync("Unexpected sovereign council : " + caseDetails.sovereignCouncil,"QNA Error");
+                        Console.WriteLine("ERROR : Unexpected sovereign council : " + caseDetails.sovereignCouncil);
+                        return false;
+                }
+                //caseDetails.proposedResponse = jsonResponse.answers[0].answer;
                 int score = 0;
                 try
                 {
@@ -1710,13 +1728,74 @@ namespace CheckForLocation
                 return false;
             }
         }
+
+        private async Task<String> ReplaceResponseTags(String response, String sovereign, Metadata[] tags)
+        {
+            try
+            {
+                ReplaceTagsPayload payload = new ReplaceTagsPayload();
+                payload.message = response;
+                payload.sovereign = sovereign;
+                payload.tags = new Tag[tags.Length];
+                int currentPayLoadCount = 0;
+                String currentPayLoadTag = "";
+
+                for (int i = 0; i < tags.Length; i++)
+                {
+                    if (i == 0)
+                    {
+                        currentPayLoadTag = tags[i].name.Substring(0, 3).ToUpper();
+                    }
+                    if(!currentPayLoadTag.Equals(tags[i].name.Substring(0, 3).ToUpper()))
+                    {
+                        currentPayLoadCount++;
+                        currentPayLoadTag=tags[i].name.Substring(0, 3).ToUpper();
+                    }
+                    payload.tags[i] = new Tag();
+                    payload.tags[i].tag = tags[currentPayLoadCount].name.Substring(0, 3).ToUpper();
+                    switch(tags[i].name.ToLower().Substring(3, 3))
+                    {
+                        case "nbc":
+                            payload.tags[currentPayLoadCount].NBC = tags[i].value;
+                            break;
+                        case "ddc":
+                            payload.tags[currentPayLoadCount].DDC = tags[i].value;
+                            break;
+                        case "snc":
+                            payload.tags[currentPayLoadCount].SNC = tags[i].value;
+                            break;
+                        default:
+                            await SendFailureAsync("Unexpected sovereign council in metadata : " + tags[i].name.ToLower().Substring(2, 3), "JSON Error");
+                            Console.WriteLine("ERROR : Unexpected sovereign council in metadata : " + tags[i].name.ToLower().Substring(2, 3));
+                            return "";
+                    }
+                    //if (tags[i].name.ToLower().Substring(2, 3).Equals("nbc")){
+                    //    payload.tags[i].NBC = tags[i].value;
+                    //}
+                }
+                
+
+                HttpClient replaceClient = new HttpClient();
+                String stringPayload = System.Text.Json.JsonSerializer.Serialize(payload);
+                HttpResponseMessage responseMessage = await replaceClient.PostAsync("https://replaceresponsetags.northampton.digital", new StringContent(System.Text.Json.JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
+                responseMessage.EnsureSuccessStatusCode();
+                string responseBody = await responseMessage.Content.ReadAsStringAsync();
+                dynamic jsonResponse = JObject.Parse(responseBody);
+                return jsonResponse.message;
+            }
+            catch (Exception error)
+            {
+                await SendFailureAsync("replace tag error", error.Message);
+                Console.WriteLine("replace tag error", error.Message);
+                return "";
+            }
+        }
         private async Task<Boolean> UpdateCaseDetailsAsync(CaseDetails caseDetails)
         {
             HttpClient cxmClient = new HttpClient();
             cxmClient.BaseAddress = new Uri(cxmEndPoint);
             String uri = "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "/edit?key=" + cxmAPIKey;
             Dictionary<string, string> cxmPayload;
-            //TODO replace with parameter 
             if (caseDetails.proposedResponseConfidence < minConfidenceLevel)
             {
                 cxmPayload = new Dictionary<string, string>
@@ -1726,8 +1805,7 @@ namespace CheckForLocation
             }
             else
             {
-                //TODO minAutoRespondLevel 
-                if (minAutoRespondLevel < caseDetails.proposedResponseConfidence)
+                if (caseDetails.proposedResponseConfidence > minAutoRespondLevel)
                 {
                     cxmPayload = new Dictionary<string, string>
                     {
