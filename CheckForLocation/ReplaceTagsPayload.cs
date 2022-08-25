@@ -12,4 +12,9 @@ public class Tag
     public string NBC { get; set; } = "";
     public string SNC { get; set; } = "";
     public string DDC { get; set; } = "";
+    public string CBC { get; set; } = "";
+    public string KBC { get; set; } = "";
+    public string BCW { get; set; } = "";
+    public string ENC { get; set; } = "";
+
 }

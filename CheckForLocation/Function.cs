@@ -1689,6 +1689,18 @@ namespace CheckForLocation
                     case "south_northants":
                         caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "SNC", qnaResponse.answers[0].metadata);
                         break;
+                    case "corby":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "CBC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "kettering":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "KBC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "wellingborough":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "BCW", qnaResponse.answers[0].metadata);
+                        break;
+                    case "east_northants":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "ENC", qnaResponse.answers[0].metadata);
+                        break;
                     default:
                         await SendFailureAsync("Unexpected sovereign council : " + caseDetails.sovereignCouncil,"QNA Error");
                         Console.WriteLine("ERROR : Unexpected sovereign council : " + caseDetails.sovereignCouncil);
@@ -1736,23 +1748,36 @@ namespace CheckForLocation
                 ReplaceTagsPayload payload = new ReplaceTagsPayload();
                 payload.message = response;
                 payload.sovereign = sovereign;
-                payload.tags = new Tag[tags.Length];
-                int currentPayLoadCount = 0;
+                int currentPayLoadCount = 1;
                 String currentPayLoadTag = "";
-
                 for (int i = 0; i < tags.Length; i++)
                 {
                     if (i == 0)
                     {
                         currentPayLoadTag = tags[i].name.Substring(0, 3).ToUpper();
                     }
+                    if (!currentPayLoadTag.Equals(tags[i].name.Substring(0, 3).ToUpper()))
+                    {
+                        currentPayLoadCount++;
+                    }
+                }
+                payload.tags = new Tag[currentPayLoadCount];
+                currentPayLoadCount = 0;
+                currentPayLoadTag = "";
+                for (int i = 0; i < tags.Length; i++)
+                {
+                    if (i == 0)
+                    {
+                        currentPayLoadTag = tags[i].name.Substring(0, 3).ToUpper();
+                        payload.tags[currentPayLoadCount] = new Tag();
+                    }
                     if(!currentPayLoadTag.Equals(tags[i].name.Substring(0, 3).ToUpper()))
                     {
                         currentPayLoadCount++;
                         currentPayLoadTag=tags[i].name.Substring(0, 3).ToUpper();
-                    }
-                    payload.tags[i] = new Tag();
-                    payload.tags[i].tag = tags[currentPayLoadCount].name.Substring(0, 3).ToUpper();
+                        payload.tags[currentPayLoadCount] = new Tag();
+                    }                  
+                    payload.tags[currentPayLoadCount].tag = tags[currentPayLoadCount].name.Substring(0, 3).ToUpper();
                     switch(tags[i].name.ToLower().Substring(3, 3))
                     {
                         case "nbc":
@@ -1763,6 +1788,18 @@ namespace CheckForLocation
                             break;
                         case "snc":
                             payload.tags[currentPayLoadCount].SNC = tags[i].value;
+                            break;
+                        case "cbc":
+                            payload.tags[currentPayLoadCount].CBC = tags[i].value;
+                            break;
+                        case "kbc":
+                            payload.tags[currentPayLoadCount].KBC = tags[i].value;
+                            break;
+                        case "bcw":
+                            payload.tags[currentPayLoadCount].BCW = tags[i].value;
+                            break;
+                        case "enc":
+                            payload.tags[currentPayLoadCount].ENC = tags[i].value;
                             break;
                         default:
                             await SendFailureAsync("Unexpected sovereign council in metadata : " + tags[i].name.ToLower().Substring(2, 3), "JSON Error");
