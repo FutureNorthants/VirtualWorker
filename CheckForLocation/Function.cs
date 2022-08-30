@@ -632,10 +632,14 @@ namespace CheckForLocation
                             else
                             {
                                 await GetProposedResponse(caseDetails);
-                                if(caseDetails.proposedResponseConfidence > minAutoRespondLevel)
+                                if(caseDetails.proposedResponseConfidence >= minAutoRespondLevel)
                                 {
                                     UpdateCaseString("email-comments", "Automated Response");
                                     await TransitionCaseAsync("automated-response");
+                                }
+                                else if (!west && caseDetails.proposedResponseConfidence >= minConfidenceLevel) 
+                                {
+                                    await TransitionCaseAsync("hub-awaiting-review");
                                 }
                                 else
                                 {
