@@ -22,9 +22,12 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
+using JsonException = System.Text.Json.JsonException;
 
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]
 
@@ -1756,7 +1759,7 @@ namespace CheckForLocation
                 ReplaceTagsPayload payload = new ReplaceTagsPayload();
                 payload.message = response;
                 payload.sovereign = sovereign;
-                int currentPayLoadCount = 1;
+                int currentPayLoadCount = 0;
                 String currentPayLoadTag = "";
                 for (int i = 0; i < tags.Length; i++)
                 {
@@ -1772,46 +1775,46 @@ namespace CheckForLocation
                 payload.tags = new Tag[currentPayLoadCount];
                 currentPayLoadCount = 0;
                 currentPayLoadTag = "";
-                for (int i = 0; i < tags.Length; i++)
+                for (int currentTag = 0; currentTag < tags.Length; currentTag++)
                 {
-                    if (i == 0)
+                    if (currentTag == 0)
                     {
-                        currentPayLoadTag = tags[i].name.Substring(0, 3).ToUpper();
+                        currentPayLoadTag = tags[currentTag].name.Substring(0, 3).ToUpper();
                         payload.tags[currentPayLoadCount] = new Tag();
                     }
-                    if(!currentPayLoadTag.Equals(tags[i].name.Substring(0, 3).ToUpper()))
+                    if(!currentPayLoadTag.Equals(tags[currentTag].name.Substring(0, 3).ToUpper()))
                     {
                         currentPayLoadCount++;
-                        currentPayLoadTag=tags[i].name.Substring(0, 3).ToUpper();
+                        currentPayLoadTag=tags[currentTag].name.Substring(0, 3).ToUpper();
                         payload.tags[currentPayLoadCount] = new Tag();
                     }                  
-                    payload.tags[currentPayLoadCount].tag = tags[currentPayLoadCount].name.Substring(0, 3).ToUpper();
-                    switch(tags[i].name.ToLower().Substring(3, 3))
+                    payload.tags[currentPayLoadCount].tag = tags[currentTag].name.Substring(0, 3).ToUpper();
+                    switch(tags[currentTag].name.ToLower().Substring(3, 3))
                     {
                         case "nbc":
-                            payload.tags[currentPayLoadCount].NBC = tags[i].value;
+                            payload.tags[currentPayLoadCount].NBC = tags[currentTag].value;
                             break;
                         case "ddc":
-                            payload.tags[currentPayLoadCount].DDC = tags[i].value;
+                            payload.tags[currentPayLoadCount].DDC = tags[currentTag].value;
                             break;
                         case "snc":
-                            payload.tags[currentPayLoadCount].SNC = tags[i].value;
+                            payload.tags[currentPayLoadCount].SNC = tags[currentTag].value;
                             break;
                         case "cbc":
-                            payload.tags[currentPayLoadCount].CBC = tags[i].value;
+                            payload.tags[currentPayLoadCount].CBC = tags[currentTag].value;
                             break;
                         case "kbc":
-                            payload.tags[currentPayLoadCount].KBC = tags[i].value;
+                            payload.tags[currentPayLoadCount].KBC = tags[currentTag].value;
                             break;
                         case "bcw":
-                            payload.tags[currentPayLoadCount].BCW = tags[i].value;
+                            payload.tags[currentPayLoadCount].BCW = tags[currentTag].value;
                             break;
                         case "enc":
-                            payload.tags[currentPayLoadCount].ENC = tags[i].value;
+                            payload.tags[currentPayLoadCount].ENC = tags[currentTag].value;
                             break;
                         default:
-                            await SendFailureAsync("Unexpected sovereign council in metadata : " + tags[i].name.ToLower().Substring(2, 3), "JSON Error");
-                            Console.WriteLine("ERROR : Unexpected sovereign council in metadata : " + tags[i].name.ToLower().Substring(2, 3));
+                            await SendFailureAsync("Unexpected sovereign council in metadata : " + tags[currentTag].name.ToLower().Substring(2, 3), "JSON Error");
+                            Console.WriteLine("ERROR : Unexpected sovereign council in metadata : " + tags[currentTag].name.ToLower().Substring(2, 3));
                             return "";
                     }
                     //if (tags[i].name.ToLower().Substring(2, 3).Equals("nbc")){
@@ -1821,7 +1824,8 @@ namespace CheckForLocation
                 
 
                 HttpClient replaceClient = new HttpClient();
-                String stringPayload = System.Text.Json.JsonSerializer.Serialize(payload);
+                JsonSerializerOptions options = new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, WriteIndented = false };
+                string stringPayload = System.Text.Json.JsonSerializer.Serialize(payload,options);
                 HttpResponseMessage responseMessage = await replaceClient.PostAsync("https://replaceresponsetags.northampton.digital", new StringContent(System.Text.Json.JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
                 responseMessage.EnsureSuccessStatusCode();
                 string responseBody = await responseMessage.Content.ReadAsStringAsync();
