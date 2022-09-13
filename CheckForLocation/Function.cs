@@ -1763,12 +1763,9 @@ namespace CheckForLocation
                 String currentPayLoadTag = "";
                 for (int i = 0; i < tags.Length; i++)
                 {
-                    if (i == 0)
+                    if (i == 0||!currentPayLoadTag.Equals(tags[i].name.Substring(0, 3).ToUpper()))
                     {
                         currentPayLoadTag = tags[i].name.Substring(0, 3).ToUpper();
-                    }
-                    if (!currentPayLoadTag.Equals(tags[i].name.Substring(0, 3).ToUpper()))
-                    {
                         currentPayLoadCount++;
                     }
                 }
@@ -1817,15 +1814,8 @@ namespace CheckForLocation
                             Console.WriteLine("ERROR : Unexpected sovereign council in metadata : " + tags[currentTag].name.ToLower().Substring(2, 3));
                             return "";
                     }
-                    //if (tags[i].name.ToLower().Substring(2, 3).Equals("nbc")){
-                    //    payload.tags[i].NBC = tags[i].value;
-                    //}
                 }
-                
-
                 HttpClient replaceClient = new HttpClient();
-                JsonSerializerOptions options = new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, WriteIndented = false };
-                string stringPayload = System.Text.Json.JsonSerializer.Serialize(payload,options);
                 HttpResponseMessage responseMessage = await replaceClient.PostAsync("https://replaceresponsetags.northampton.digital", new StringContent(System.Text.Json.JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
                 responseMessage.EnsureSuccessStatusCode();
                 string responseBody = await responseMessage.Content.ReadAsStringAsync();
@@ -1834,8 +1824,9 @@ namespace CheckForLocation
             }
             catch (Exception error)
             {
-                await SendFailureAsync("replace tag error", error.Message);
-                Console.WriteLine("replace tag error", error.Message);
+                await SendFailureAsync("Replace tag error", error.Message);
+                Console.WriteLine("ERROR : Replacing QnA Tags : " + error.Message);
+                Console.WriteLine("ERROR : Replacing QnA Tags :  " + error.StackTrace);
                 return "";
             }
         }
