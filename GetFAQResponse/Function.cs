@@ -168,7 +168,7 @@ namespace GetFAQResponse
                         }
 
                         caseDetails = await GetCaseDetailsAsync();
-                        if (west)
+                        if (west && !caseDetails.unitary)
                         {
                             if (await GetProposedResponse() && await UpdateCaseDetailsAsync() && await TransitionCaseAsync())
                             {
