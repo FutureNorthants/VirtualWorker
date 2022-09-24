@@ -487,7 +487,7 @@ namespace CheckForLocation
                         forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
                         defaultRouting = true;
                     }
-                    success = await SendEmails(caseDetails, forwardingEmailAddress, true);
+                    success = await SendEmails(caseDetails, forwardingEmailAddress, true, false);
                     if (success)
                     {
                         caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
@@ -511,7 +511,7 @@ namespace CheckForLocation
                             forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
                             defaultRouting = true;
                         }
-                        success = await SendEmails(caseDetails, forwardingEmailAddress, true);
+                        success = await SendEmails(caseDetails, forwardingEmailAddress, true, false);
                         if (success)
                         {
                             caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
@@ -524,12 +524,12 @@ namespace CheckForLocation
                         if (!String.IsNullOrEmpty(caseDetails.forward))
                         {
                             String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
-                            success = await SendEmails(caseDetails, forwardingEmailAddress, replyToCustomer);
+                            success = await SendEmails(caseDetails, forwardingEmailAddress, replyToCustomer, false);
                             replyToCustomer = false;
                         }
                         if (!String.IsNullOrEmpty(caseDetails.nncForwardEMailTo))
                         {
-                            success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer);
+                            success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer, false);
                         }
                     }
                     if (success)
@@ -635,18 +635,32 @@ namespace CheckForLocation
                             else
                             {
                                 await GetProposedResponse(caseDetails);
-                                if(caseDetails.proposedResponseConfidence >= minAutoRespondLevel)
+                                Boolean includeProposedResponse = false;
+                                if (caseDetails.proposedResponseConfidence >= minConfidenceLevel)
+                                {
+                                    includeProposedResponse = true;
+                                }
+                                if (caseDetails.proposedResponseConfidence >= minAutoRespondLevel)
                                 {
                                     UpdateCaseString("email-comments", "Automated Response");
                                     await TransitionCaseAsync("automated-response");
                                 }
                                 else if (!west && caseDetails.proposedResponseConfidence >= minConfidenceLevel) 
                                 {
-                                    await TransitionCaseAsync("hub-awaiting-review");
+                                    if (sovereignLocation.SovereignCouncilName.Equals("east_northants"))
+                                    {
+                                        await TransitionCaseAsync("hub-awaiting-review");
+                                    }
+                                    else
+                                    {
+                                        success = await SendEmails(caseDetails, forwardingEmailAddress, true, includeProposedResponse);
+                                        UpdateCaseString("email-comments", "Closing case");
+                                        await TransitionCaseAsync("close-case");
+                                    }                                 
                                 }
                                 else
-                                {
-                                    success = await SendEmails(caseDetails, forwardingEmailAddress, true);
+                                {                                   
+                                    success = await SendEmails(caseDetails, forwardingEmailAddress, true, includeProposedResponse);
                                     UpdateCaseString("email-comments", "Closing case");
                                     await TransitionCaseAsync("close-case");
                                 }                                 
@@ -751,6 +765,7 @@ namespace CheckForLocation
                 emailBody = emailBody.Replace("ZZZ", caseDetails.enquiryDetails);
                 emailBody = emailBody.Replace("GGG", caseDetails.customerName);
                 emailBody = emailBody.Replace("NNN", persona);
+                emailBody = emailBody.Replace("RRR", caseDetails.proposedResponse);
 
                 if (String.IsNullOrEmpty(caseDetails.fullEmail))
                 {
@@ -1287,7 +1302,7 @@ namespace CheckForLocation
 
         }
 
-        private async Task<Boolean> SendEmails(CaseDetails caseDetails, String forwardingEmailAddress, Boolean replyToCustomer)
+        private async Task<Boolean> SendEmails(CaseDetails caseDetails, String forwardingEmailAddress, Boolean replyToCustomer, Boolean useProposedResponse)
         {
             try
             {
@@ -1347,13 +1362,21 @@ namespace CheckForLocation
                     if (caseDetails.contactUs)
                     {
                         Console.WriteLine(caseReference + " : ContactUs case");
-                        forwardFileName = "email-sovereign-forward-contactus.txt";
+                        if (useProposedResponse)
+                        {
+                            forwardFileName = "email-sovereign-forward-contactus-incresponse.txt";
+                        }
+                        else
+                        {
+                            forwardFileName = "email-sovereign-forward-contactus.txt";
+                        }
                     }
                     else
                     {
                         Console.WriteLine(caseReference + " : Email case");
                         forwardFileName = "email-sovereign-forward.txt";
                     }
+                    //TODO this is where email forwarding happens
                     emailBody = await FormatEmailAsync(caseDetails, forwardFileName);
                     Console.WriteLine(caseReference + " : Email contents set");
                     if (!String.IsNullOrEmpty(emailBody))
