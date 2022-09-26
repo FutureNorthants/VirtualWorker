@@ -630,11 +630,12 @@ namespace CheckForLocation
                             {
                                 UpdateCaseBoolean("unitary", false);
                                 UpdateCaseString("email-comments", "Transitioning case to local process");
+                                await GetProposedResponse(caseDetails, secrets.nbcQNAurl, secrets.nbcQNAauth);
                                 await TransitionCaseAsync("awaiting-review");
                             }
                             else
                             {
-                                await GetProposedResponse(caseDetails);
+                                await GetProposedResponse(caseDetails, secrets.QNAurl, secrets.QNAauth);
                                 Boolean includeProposedResponse = false;
                                 if (caseDetails.proposedResponseConfidence >= minConfidenceLevel)
                                 {
@@ -1694,7 +1695,7 @@ namespace CheckForLocation
                 return await TransitionCaseAsync("hub-awaiting-review");
             }
         }
-        private async Task<Boolean> GetProposedResponse(CaseDetails caseDetails)
+        private async Task<Boolean> GetProposedResponse(CaseDetails caseDetails, String QNAurl, String QNAauth)
         {
             try
             {
@@ -1989,6 +1990,8 @@ public class Secrets
     public String SubjectServiceMinConfidenceLive { get; set; }
     public String QNAurl { get; set; }
     public String QNAauth { get; set; }
+    public String nbcQNAurl { get; set; }
+    public String nbcQNAauth { get; set; }
     public String minAutoResponseLevel { get; set; }
     public String minResponseConfidenceLevel { get; set; }
 }
