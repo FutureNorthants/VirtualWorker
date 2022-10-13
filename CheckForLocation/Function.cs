@@ -25,6 +25,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using JsonException = System.Text.Json.JsonException;
@@ -662,8 +663,11 @@ namespace CheckForLocation
                                 else
                                 {                                   
                                     success = await SendEmails(caseDetails, forwardingEmailAddress, true, includeProposedResponse);
+                                    Console.WriteLine(caseReference + " : Finished sending emails");
                                     UpdateCaseString("email-comments", "Closing case");
+                                    Console.WriteLine(caseReference + " : Finished updating case");
                                     await TransitionCaseAsync("close-case");
+                                    Console.WriteLine(caseReference + " : Finished closing case");
                                 }                                 
                             }
                         }
@@ -714,10 +718,12 @@ namespace CheckForLocation
             }
             catch (ApplicationException error)
             {
+                Console.WriteLine(caseReference + " : ERROR : ApplicationException : " + error);
                 throw new ApplicationException(error.Message);
-            }
-            catch (Exception)
+            } 
+            catch (Exception error)
             {
+                Console.WriteLine(caseReference + " : ERROR : Exception : " + error);
                 return false;
             }
             return success;
@@ -1088,6 +1094,8 @@ namespace CheckForLocation
 
         private Boolean UpdateCaseString(String fieldName, String fieldValue)
         {
+            Console.WriteLine("---");
+            Console.WriteLine(caseReference + " : UpdateCaseString Starts");
             if (fieldName.Equals("sovereign-service-area"))
             {
                 if (fieldValue.ToLower().Equals("waste"))
@@ -1106,12 +1114,14 @@ namespace CheckForLocation
             String data = "{\"" + fieldName + "\":\"" + fieldValue.ToLower() + "\"" +
                 "}";
 
-            if (UpdateCase(data))
+            if (UpdateCase2(data))
             {
+                Console.WriteLine(caseReference + " : UpdateCaseString Ends");
                 return true;
             }
             else
             {
+                Console.WriteLine(caseReference + " : ERROR UpdateCaseString Ends");
                 Console.WriteLine(caseReference + " : Error updating CXM field " + fieldName + " with message : " + fieldValue);
                 return false;
             }
@@ -1122,8 +1132,8 @@ namespace CheckForLocation
 
             String data = "{\"" + fieldName + "\":\"" + fieldValue + "\"" +
                 "}";
-
-            if (UpdateCase(data))
+            
+            if (UpdateCase2(data))
             {
                 return true;
             }
@@ -1136,9 +1146,11 @@ namespace CheckForLocation
 
         private Boolean UpdateCase(String data)
         {
-            Console.WriteLine($"PATCH payload : " + data);
-
+            Console.WriteLine("---");
+            Console.WriteLine(caseReference + " : UpdateCase Starts");
             String url = cxmEndPoint + "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "/edit?key=" + cxmAPIKey;
+            Console.WriteLine($"PATCH url : " + url);
+            Console.WriteLine($"PATCH payload : " + data);
             Encoding encoding = Encoding.Default;
             HttpWebRequest patchRequest = (HttpWebRequest)WebRequest.Create(url);
             patchRequest.Method = "PATCH";
@@ -1149,17 +1161,47 @@ namespace CheckForLocation
             dataStream.Close();
             try
             {
+                Console.WriteLine(caseReference + " : Sending Update");
                 HttpWebResponse patchResponse = (HttpWebResponse)patchRequest.GetResponse();
                 String result = "";
                 using StreamReader reader = new StreamReader(patchResponse.GetResponseStream(), Encoding.Default);
                 result = reader.ReadToEnd();
+                Console.WriteLine(caseReference + " : Received Response");
             }
             catch (Exception error)
             {
+                Console.WriteLine(caseReference + " ERROR : UpdateCase Failed");
                 Console.WriteLine(caseReference + " : " + error.ToString());
                 return false;
             }
-            return true; ;
+            Console.WriteLine(caseReference + " : UpdateCase Ends");
+            return true;
+        }
+
+        private Boolean UpdateCase2(String payload)
+        {
+            CancellationTokenSource cancellationToken = new CancellationTokenSource();
+            cancellationToken.CancelAfter(10000);
+            HttpClient client = new HttpClient();
+            HttpContent content = new StringContent(payload, Encoding.UTF8, "application/json");
+            String url = cxmEndPoint + "/api/service-api/" + cxmAPIName + "/case/" + caseReference + "/edit?key=" + cxmAPIKey;
+            try
+            {
+                HttpResponseMessage response = client.PatchAsync(url, content).Result;
+                return true;
+            }
+            catch (OperationCanceledException error)
+            {
+                Console.WriteLine(caseReference + " ERROR : UpdateCase Timeout");
+                Console.WriteLine(caseReference + " : " + error.ToString());
+                return false;
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine(caseReference + " ERROR : UpdateCase Failed");
+                Console.WriteLine(caseReference + " : " + error.ToString());
+                return false;
+            }           
         }
 
         private async Task<string> GetServiceAsync(String customerContact, Boolean usingSubject)
@@ -1557,6 +1599,8 @@ namespace CheckForLocation
             try
             {
                 SendRawEmailRequest sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, bccAddress, includeOriginalEmail)) };
+                //sendRequest.Source = "norbert@wnc.northampton.digital";
+                //sendRequest.ReturnPathArn = "arn:aws:ses:eu-west-1:898823515462:identity/northampton.digital";
                 SendRawEmailResponse response = await client.SendRawEmailAsync(sendRequest);
                 return true;
             }
@@ -1593,6 +1637,7 @@ namespace CheckForLocation
             message.To.Add(new MailboxAddress(string.Empty, toAddress));
             message.Bcc.Add(new MailboxAddress(string.Empty, bccAddress));
             message.Subject = subject;
+            message.Headers.Add(new Header("Return-Path", "norbert@northampton.digital"));
 
             try
             {
