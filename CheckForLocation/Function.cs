@@ -1821,10 +1821,11 @@ namespace CheckForLocation
         {
             try
             {
-                if(tags.Length == 0)
+                if (tags.Length == 0)
                 {
                     return response;
                 }
+                response = response.Replace("**", "");
                 ReplaceTagsPayload payload = new ReplaceTagsPayload();
                 payload.message = response;
                 payload.sovereign = sovereign;
