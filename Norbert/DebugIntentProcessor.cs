@@ -1,5 +1,6 @@
 using Amazon.Lambda.Core;
 using Amazon.Lambda.LexV2Events;
+using System.Text.Json;
 
 namespace Norbert;
 
@@ -29,26 +30,15 @@ public class DebugIntentProcessor : AbstractIntentProcessor
         {
             Console.WriteLine("Error : " + error.Message);
         }
-        //LexV2Button[] buttons = new LexV2Button[4];
-        //buttons[0] = new LexV2Button { Text = "Leave a message", Value = "message"};
-        //buttons[1] = new LexV2Button { Text = "Request a callback", Value = "callback"};
-        //buttons[2] = new LexV2Button { Text = "Chat with Staff", Value = "handoff"};
-        //buttons[3] = new LexV2Button { Text = "End the chat", Value = "stop" };
-        //return CloseWithResponseCard(
-        //        "Debug",
-        //        "Fulfilled",
-        //        context.FunctionName + "( " + instance + " " + context.FunctionVersion + " ) @ " + currentTime.ToString("dddd, dd MMMM yyyy HH:mm:ss"),
-        //        "I think we need the human touch here",
-        //        "What would you like to do?",
-        //        buttons,
-        //        requestAttributes,
-        //        sessionAttributes
-        //);
+
+        String[] responseMessages = {
+            context.FunctionName + "( " + instance + " " + context.FunctionVersion + " ) @ " + currentTime.ToString("dddd, dd MMMM yyyy HH:mm:ss")
+        };
 
         return Close(
                     "Debug",
                     "Fulfilled",
-                    context.FunctionName + "( " + instance + " " + context.FunctionVersion + " ) @ " + currentTime.ToString("dddd, dd MMMM yyyy HH:mm:ss"),
+                    responseMessages,
                     requestAttributes,
                     sessionAttributes
                 );
