@@ -119,16 +119,16 @@ namespace CheckForLocation
 
                 try
                 {
-                    if (!Int32.TryParse(secrets.minAutoResponseLevel, out minAutoRespondLevel))
+                    if (!Int32.TryParse(secrets.minAutoResponseLevelTest, out minAutoRespondLevel))
                     {
-                        await SendFailureAsync("minAutoRespondLevel not numeric : " + secrets.minAutoResponseLevel, "Lambda Parameter Error");
-                        Console.WriteLine("ERROR : minAutoRespondLevel not numeric : " + secrets.minAutoResponseLevel);
+                        await SendFailureAsync("minAutoRespondLevelTest not numeric : " + secrets.minAutoResponseLevelTest, "Lambda Parameter Error");
+                        Console.WriteLine("ERROR : minAutoRespondLevelTest not numeric : " + secrets.minAutoResponseLevelTest);
                     }
                 }
                 catch (Exception error)
                 {
-                    await SendFailureAsync("minAutoRespondLevel Parse Error : " + secrets.minAutoResponseLevel, error.Message);
-                    Console.WriteLine("ERROR : minAutoRespondLevel Parse Error : " + secrets.minAutoResponseLevel + " : " + error.Message);
+                    await SendFailureAsync("minAutoRespondLevelTest Parse Error : " + secrets.minAutoResponseLevelTest, error.Message);
+                    Console.WriteLine("ERROR : minAutoRespondLevelTest Parse Error : " + secrets.minAutoResponseLevelTest + " : " + error.Message);
                 }
 
                 Random randonNumber = new Random();
@@ -209,6 +209,20 @@ namespace CheckForLocation
                         }
                         catch (Exception) { }
                     }
+                    try
+                    {
+                        if (!Int32.TryParse(secrets.minAutoResponseLevelLive, out minAutoRespondLevel))
+                        {
+                            await SendFailureAsync("minAutoRespondLevelLive not numeric : " + secrets.minAutoResponseLevelLive, "Lambda Parameter Error");
+                            Console.WriteLine("ERROR : minAutoRespondLevelLive not numeric : " + secrets.minAutoResponseLevelLive);
+                        }
+                    }
+                    catch (Exception error)
+                    {
+                        await SendFailureAsync("minAutoRespondLevelLive Parse Error : " + secrets.minAutoResponseLevelTest, error.Message);
+                        Console.WriteLine("ERROR : minAutoRespondLevelLive Parse Error : " + secrets.minAutoResponseLevelTest + " : " + error.Message);
+                    }
+                    Console.WriteLine("minAutoRespondLevelLive : " + minAutoRespondLevel);
                 }
                 else
                 {
@@ -260,6 +274,7 @@ namespace CheckForLocation
                         }
                         catch (Exception) { }
                     }
+                    Console.WriteLine("minAutoRespondLevelTest : " + minAutoRespondLevel);
                 }
                 Console.WriteLine(caseReference + " : Prevent Out of Area : " + preventOutOfArea);
                 CaseDetails caseDetails = await GetCaseDetailsAsync();
@@ -2038,8 +2053,9 @@ public class Secrets
     public String QNAauth { get; set; }
     public String nbcQNAurl { get; set; }
     public String nbcQNAauth { get; set; }
-    public String minAutoResponseLevel { get; set; }
     public String minResponseConfidenceLevel { get; set; }
+    public String minAutoResponseLevelTest { get; set; }
+    public String minAutoResponseLevelLive { get; set; }
 }
 
 public class Location
