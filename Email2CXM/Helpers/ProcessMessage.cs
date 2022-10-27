@@ -21,7 +21,6 @@ using Amazon.SecretsManager.Model;
 using System.Linq;
 using HtmlAgilityPack;
 using System.Text.Encodings.Web;
-using RestSharp;
 
 namespace Email2CXM.Helpers
 {

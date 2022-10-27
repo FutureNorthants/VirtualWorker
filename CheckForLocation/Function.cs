@@ -68,8 +68,6 @@ namespace CheckForLocation
         private Boolean defaultRouting = false;
         private Boolean outOfArea = false;
         private Boolean reopened = false;
-        private Boolean OutOfArea = false;
-
         private Secrets secrets = null;
 
         private Location sovereignLocation;
@@ -513,7 +511,6 @@ namespace CheckForLocation
                     sovereignLocation = await CheckForLocationAsync(caseDetails.Subject + " " + searchText);
                     if (caseDetails.contactUs && !sovereignLocation.Success)
                     {
-                        //TODO Not finding location on occasion for NNC
                         Console.WriteLine("INFO : Checking for Location Using customerAddress : " + caseDetails.customerAddress);
                         sovereignLocation = await CheckForLocationAsync(caseDetails.customerAddress);
                     }
@@ -529,10 +526,13 @@ namespace CheckForLocation
                     {
                         Console.WriteLine(caseReference + " : SovereignServiceArea not set using Lex ");
                         //TODO use subject then fullemail
-                        if(!caseDetails.Subject.ToLower().Contains("council form has been submitted"))
-                        {
-                            service = await GetServiceAsync(caseDetails.Subject,true);
+                        try {
+                            if (!caseDetails.Subject.ToLower().Contains("council form has been submitted"))
+                            {
+                                service = await GetServiceAsync(caseDetails.Subject, true);
+                            }
                         }
+                        catch(Exception) { }                     
                         if (service.Equals(""))
                         {
                             service = await GetServiceAsync(caseDetails.fullEmail,false);
@@ -937,7 +937,7 @@ namespace CheckForLocation
         {
             Postcode postCodeData = new Postcode();
 
-            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, postCodeURL + postcode);
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, postCodeURL + postcode.Replace(" ", ""));
 
             HttpClient httpClient = new HttpClient();
 
@@ -952,7 +952,8 @@ namespace CheckForLocation
                     JObject caseSearch = JObject.Parse(responseString);
                     try
                     {
-                        if ((int)caseSearch.SelectToken("numOfSovereign") == 1)
+                        JArray sovereignArray = (JArray)caseSearch.SelectToken("sovereigns");
+                        if (sovereignArray.Count == 1)
                         {
                             postCodeData.singleSov = true;
                         }
@@ -964,32 +965,30 @@ namespace CheckForLocation
                     catch (Exception) { }
                     try
                     {
-                        if ((int)caseSearch.SelectToken("numOfUnitary") == 1)
+                        JArray unitariesArray = (JArray)caseSearch.SelectToken("unitaries");
+                        if (unitariesArray.Count == 1)
                         {
                             postCodeData.singleUni = true;
+                            if (((String)caseSearch.SelectToken("unitaries[0].name")).ToLower().Equals("west"))
+                            {
+                                postCodeData.west = true;
+                            }
                         }
                         else
                         {
                             UpdateCaseString("email-comments", "Postcode spans both WNC and NNC");
                         }
+  
                     }
                     catch (Exception) { }
                     try
                     {
-                        if ((int)caseSearch.SelectToken("unitary[0].unitaryCode") == 2)
-                        {
-                            postCodeData.west = true;
-                        }
+                        postCodeData.SovereignCouncilName = (String)caseSearch.SelectToken("sovereigns[0].name").ToString().ToLower();
                     }
                     catch (Exception) { }
                     try
                     {
-                        postCodeData.SovereignCouncilName = (String)caseSearch.SelectToken("sovereign[0].sovereignName").ToString().ToLower();
-                    }
-                    catch (Exception) { }
-                    try
-                    {
-                        if (postCodeData.SovereignCouncilName.Equals("south northants"))
+                        if (postCodeData.SovereignCouncilName.Equals("south northamptonshire"))
                         {
                             postCodeData.SovereignCouncilName = "south_northants";
                         }
@@ -997,7 +996,7 @@ namespace CheckForLocation
                     catch (Exception) { }
                     try
                     {
-                        if (postCodeData.SovereignCouncilName.Equals("east northants"))
+                        if (postCodeData.SovereignCouncilName.Equals("east northamptonshire"))
                         {
                             postCodeData.SovereignCouncilName = "east_northants";
                         }
@@ -1018,6 +1017,7 @@ namespace CheckForLocation
             else
             {
                 postCodeData.success = false;
+                UpdateCaseString("email-comments",  "Postcode API failed - assigned to staff");
             }
             return postCodeData;
         }
@@ -1524,9 +1524,6 @@ namespace CheckForLocation
 
             try
             {
-                //BodyBuilder bodyBuilder = await GetMessageBodyAsync(emailID, htmlBody, textBody, includeOriginalEmail);
-                //message.Body = bodyBuilder.ToMessageBody();
-                //message = await GetMessageBodyAsync2(message, emailID, htmlBody, textBody, includeOriginalEmail);
                 message = await GetMessageBodyAsync(message, emailID, htmlBody, includeOriginalEmail);
                 return message;
             }
@@ -1542,7 +1539,6 @@ namespace CheckForLocation
             byte[] htmlBodyBytes = Encoding.UTF8.GetBytes(htmlBody);
             TextPart plain = new TextPart();
             TextPart html = new TextPart("html");
-            MimePart attachment = null;
             plain.ContentTransferEncoding = ContentEncoding.Base64;
             html.ContentTransferEncoding = ContentEncoding.Base64;
             plain.SetText(Encoding.UTF8, Encoding.Default.GetString(textBodyBytes));
@@ -1571,7 +1567,7 @@ namespace CheckForLocation
                         memoryStream.Write(buffer, 0, read);
                     }
                     imageBytes = memoryStream.ToArray();
-                    attachment = new MimePart("message", "rfc822")
+                    MimePart attachment = new MimePart("message", "rfc822")
                     {
                         Content = new MimeContent(memoryStream, ContentEncoding.Default),
                         ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
