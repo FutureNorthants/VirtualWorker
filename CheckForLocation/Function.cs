@@ -1923,6 +1923,7 @@ namespace CheckForLocation
             Dictionary<string, string> cxmPayload;
             if (caseDetails.proposedResponseConfidence < minConfidenceLevel)
             {
+                //TODO Replace lines 1927-1930 with copy of lines 1946-1950
                 cxmPayload = new Dictionary<string, string>
                 {
                     { "response-confidence", caseDetails.proposedResponseConfidence.ToString()}
