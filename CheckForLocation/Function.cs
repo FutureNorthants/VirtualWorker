@@ -1925,9 +1925,10 @@ namespace CheckForLocation
             {
                 //TODO Replace lines 1927-1930 with copy of lines 1946-1950
                 cxmPayload = new Dictionary<string, string>
-                {
-                    { "response-confidence", caseDetails.proposedResponseConfidence.ToString()}
-                };
+                    {
+                        { "contact-response", caseDetails.proposedResponse },
+                        { "response-confidence", caseDetails.proposedResponseConfidence.ToString()}
+                    };
             }
             else
             {
