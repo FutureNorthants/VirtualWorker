@@ -1652,7 +1652,7 @@ namespace CheckForLocation
             message.To.Add(new MailboxAddress(string.Empty, toAddress));
             message.Bcc.Add(new MailboxAddress(string.Empty, bccAddress));
             message.Subject = subject;
-            message.Headers.Add(new Header("Return-Path", "norbert@northampton.digital"));
+           // message.Headers.Add(new Header("Return-Path", "norbert@northampton.digital"));
 
             try
             {
