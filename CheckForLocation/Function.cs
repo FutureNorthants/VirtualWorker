@@ -1792,6 +1792,10 @@ namespace CheckForLocation
                     case "east_northants":
                         caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "ENC", qnaResponse.answers[0].metadata);
                         break;
+                    case "northamptonshire":
+                        caseDetails.proposedResponse = qnaResponse.answers[0].answer;
+                        break;
+
                     default:
                         await SendFailureAsync("Unexpected sovereign council : " + caseDetails.sovereignCouncil,"QNA Error");
                         Console.WriteLine("ERROR : Unexpected sovereign council : " + caseDetails.sovereignCouncil);
