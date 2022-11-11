@@ -1614,8 +1614,6 @@ namespace CheckForLocation
             try
             {
                 SendRawEmailRequest sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, bccAddress, includeOriginalEmail)) };
-                //sendRequest.Source = "norbert@wnc.northampton.digital";
-                //sendRequest.ReturnPathArn = "arn:aws:ses:eu-west-1:898823515462:identity/northampton.digital";
                 SendRawEmailResponse response = await client.SendRawEmailAsync(sendRequest);
                 return true;
             }
