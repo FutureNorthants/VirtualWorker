@@ -261,6 +261,7 @@ namespace Email2CXM.Helpers
 
                     try
                     {
+                        await GetCommonSignaturesAsync(emailContents);
                         String corporateSignature = await GetSignatureFromDynamoAsync(secrets.homeDomain, "");
                         int corporateSignatureLocation = emailContents.IndexOf(corporateSignature);
                         if (corporateSignatureLocation > 0)
@@ -883,6 +884,15 @@ namespace Email2CXM.Helpers
                 Console.WriteLine("ERROR : " + error.StackTrace);
                 return mycouncilCase;
             }
+        }
+        private async Task<String> GetCommonSignaturesAsync(String emailContents)
+        {
+            int signatureLocation = emailContents.ToLower().IndexOf("sent from my iphone");
+            if (signatureLocation > 0)
+            {
+                emailContents = emailContents.Remove(signatureLocation);       
+            }
+            return emailContents;
         }
 
             private async Task<String> GetSignatureFromDynamoAsync(String domain, String sigSuffix)
