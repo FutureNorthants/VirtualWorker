@@ -1431,8 +1431,15 @@ namespace CheckForLocation
                     }
                     else
                     {
+                        if(useProposedResponse)
+                        {
+                            forwardFileName = "email-sovereign-forward-inc-response.txt";
+                        }
+                        else
+                        {
+                            forwardFileName = "email-sovereign-forward.txt";
+                        }
                         Console.WriteLine(caseReference + " : Email case");
-                        forwardFileName = "email-sovereign-forward.txt";
                     }
                     //TODO this is where email forwarding happens
                     emailBody = await FormatEmailAsync(caseDetails, forwardFileName);
