@@ -885,8 +885,23 @@ namespace Email2CXM.Helpers
                 return mycouncilCase;
             }
         }
+        // TODO common signatures 
         private async Task<String> GetCommonSignaturesAsync(String emailContents)
         {
+
+            string tableName = "Thread";
+            AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);
+            Table ThreadTable = Table.LoadTable(dynamoDBClient, "CommonSignaturesTest");
+
+            ScanFilter scanFilter = new ScanFilter();
+            ScanOperationConfig config = new ScanOperationConfig()
+            {
+                Filter = scanFilter,
+                Select = SelectValues.SpecificAttributes,
+                AttributesToGet = new List<string> {"signature"}
+            };
+
+            Search search = ThreadTable.Scan(config);
             int signatureLocation = emailContents.ToLower().IndexOf("sent from my iphone");
             if (signatureLocation > 0)
             {

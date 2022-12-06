@@ -56,7 +56,7 @@ namespace Email2CXM
                 //bucket = "nnc.incoming.emails.test";
                 bucket = "norbert.emails.test";
                 //file = "street clean.eml";
-                file = "d8a8v7lgs1nnqlhscqgv88l5qorov1gattnftg01";
+                file = "lo0ho3f42u116k0dro8nh5rgkp3vv5r2lhvetk01";
             }
  
 
