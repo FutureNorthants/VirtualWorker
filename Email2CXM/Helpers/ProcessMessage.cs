@@ -21,6 +21,7 @@ using Amazon.SecretsManager.Model;
 using System.Linq;
 using HtmlAgilityPack;
 using System.Text.Encodings.Web;
+using Amazon.DynamoDBv2.DataModel;
 
 namespace Email2CXM.Helpers
 {
@@ -888,20 +889,37 @@ namespace Email2CXM.Helpers
         // TODO common signatures 
         private async Task<String> GetCommonSignaturesAsync(String emailContents)
         {
-
-            string tableName = "Thread";
             AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);
-            Table ThreadTable = Table.LoadTable(dynamoDBClient, "CommonSignaturesTest");
+            //Table ThreadTable = Table.LoadTable(dynamoDBClient, "CommonSignaturesTest");
 
-            ScanFilter scanFilter = new ScanFilter();
-            ScanOperationConfig config = new ScanOperationConfig()
+            ////ScanFilter scanFilter = new ScanFilter();
+            //ScanOperationConfig config = new ScanOperationConfig()
+            //{
+            //    //Filter = scanFilter,
+            //    Select = SelectValues.AllAttributes,
+            //    AttributesToGet = new List<string> {"wibble"}
+            //};
+            //Search search = ThreadTable.Scan(config);
+
+            //AmazonDynamoDBClient client = new AmazonDynamoDBClient();
+
+            ScanRequest request = new ScanRequest
             {
-                Filter = scanFilter,
-                Select = SelectValues.SpecificAttributes,
-                AttributesToGet = new List<string> {"signature"}
+                TableName = "CommonSignaturesTest",
             };
 
-            Search search = ThreadTable.Scan(config);
+            ScanResponse response = await dynamoDBClient.ScanAsync(request);
+
+            foreach (Dictionary<string, AttributeValue> item in response.Items)
+            {
+                int x = 1;
+            }
+
+            DynamoDBContext context = new DynamoDBContext(dynamoDBClient);
+
+   
+ 
+
             int signatureLocation = emailContents.ToLower().IndexOf("sent from my iphone");
             if (signatureLocation > 0)
             {
