@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -870,12 +871,17 @@ namespace CheckForLocation
             {
                 MatchCollection matches = Regex.Matches(emailBody, regString);
 
-                foreach (Match match in matches)
+                for (int currentPostcode = 0; currentPostcode < matches.Count; currentPostcode++)
                 {
+                    Boolean lastEntry = false;
+                    if (currentPostcode == matches.Count - 1)
+                    {
+                        lastEntry = true;
+                    }
                     sovereignLocation.PostcodeFound = true;
-                    GroupCollection groups = match.Groups;
+                    GroupCollection groups = matches[currentPostcode].Groups;
                     Console.WriteLine(caseReference + " : INFO : CheckPostcode input : " + groups[0].Value);
-                    Postcode postCodeData = await CheckPostcode(groups[0].Value);
+                    Postcode postCodeData = await CheckPostcode(groups[0].Value,lastEntry);
                     Console.WriteLine(caseReference + " : INFO : CheckPostcode response : " + postCodeData.success);
                     try
                     {
@@ -889,6 +895,26 @@ namespace CheckForLocation
                     }
                     catch (Exception) { }
                 }
+
+                //foreach (Match match in matches)
+                //{
+                //    sovereignLocation.PostcodeFound = true;
+                //    GroupCollection groups = match.Groups;
+                //    Console.WriteLine(caseReference + " : INFO : CheckPostcode input : " + groups[0].Value);
+                //    Postcode postCodeData = await CheckPostcode(groups[0].Value);
+                //    Console.WriteLine(caseReference + " : INFO : CheckPostcode response : " + postCodeData.success);
+                //    try
+                //    {
+                //        if (postCodeData.success)
+                //        {
+                //            sovereignLocation.SovereignCouncilName = postCodeData.SovereignCouncilName;
+                //            sovereignLocation.sovereignWest = postCodeData.west;
+                //            sovereignLocation.Success = true;
+                //            return sovereignLocation;
+                //        }
+                //    }
+                //    catch (Exception) { }
+                //}
             }
 
             if (sovereignLocation.PostcodeFound)
@@ -1018,9 +1044,12 @@ namespace CheckForLocation
             return sovereignLocation;
         }
 
-        private async Task<Postcode> CheckPostcode(String postcode)
+        private async Task<Postcode> CheckPostcode(String postcode, Boolean lastEntry)
         {
             Postcode postCodeData = new Postcode();
+
+            Regex rgx = new Regex("[^a-zA-Z0-9 -]");
+            postcode = rgx.Replace(postcode, "");
 
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, postCodeURL + postcode.Replace(" ", ""));
 
@@ -1102,7 +1131,10 @@ namespace CheckForLocation
             else
             {
                 postCodeData.success = false;
-                UpdateCaseString("email-comments",  "Postcode API failed - assigned to staff");
+                if (lastEntry)
+                {
+                    UpdateCaseString("email-comments", "Postcode API failed - assigned to staff");
+                }             
             }
             return postCodeData;
         }
