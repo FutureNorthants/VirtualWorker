@@ -56,6 +56,7 @@ namespace Email2CXM.Helpers
         public string telNo { get; set; } = null;
         public string address { get; set; } = null;
         public string ContactUsTableMapping { get; set; } = null;
+        public string commonSignaturesTableName { get; set; } = null;   
 
         private string MyCouncilEndPoint = "";
 
@@ -197,6 +198,7 @@ namespace Email2CXM.Helpers
                         if (liveInstance)
                         {
                             MyCouncilEndPoint = secrets.MyCouncilLiveEndPoint;
+                            commonSignaturesTableName = secrets.commonSignaturesTableLive;
                             if (west)
                             {
                                 cxmEndPoint = secrets.cxmEndPointLive;
@@ -222,6 +224,7 @@ namespace Email2CXM.Helpers
                         else  
                         {
                             MyCouncilEndPoint = secrets.MyCouncilTestEndPoint;
+                            commonSignaturesTableName = secrets.commonSignaturesTableTest;
                             if (west)
                             {
                                 cxmEndPoint = secrets.cxmEndPointTest;
@@ -890,40 +893,23 @@ namespace Email2CXM.Helpers
         private async Task<String> GetCommonSignaturesAsync(String emailContents)
         {
             AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);
-            //Table ThreadTable = Table.LoadTable(dynamoDBClient, "CommonSignaturesTest");
-
-            ////ScanFilter scanFilter = new ScanFilter();
-            //ScanOperationConfig config = new ScanOperationConfig()
-            //{
-            //    //Filter = scanFilter,
-            //    Select = SelectValues.AllAttributes,
-            //    AttributesToGet = new List<string> {"wibble"}
-            //};
-            //Search search = ThreadTable.Scan(config);
-
-            //AmazonDynamoDBClient client = new AmazonDynamoDBClient();
 
             ScanRequest request = new ScanRequest
             {
-                TableName = "CommonSignaturesTest",
+                TableName = commonSignaturesTableName,
             };
 
             ScanResponse response = await dynamoDBClient.ScanAsync(request);
 
             foreach (Dictionary<string, AttributeValue> item in response.Items)
             {
-                int x = 1;
-            }
+                string signature = item["signature"].S;
+                int signatureLocation = emailContents.ToLower().IndexOf(signature);
+                if (signatureLocation > 0)
+                {
+                    emailContents = emailContents.Remove(signatureLocation);
+                }
 
-            DynamoDBContext context = new DynamoDBContext(dynamoDBClient);
-
-   
- 
-
-            int signatureLocation = emailContents.ToLower().IndexOf("sent from my iphone");
-            if (signatureLocation > 0)
-            {
-                emailContents = emailContents.Remove(signatureLocation);       
             }
             return emailContents;
         }
@@ -1489,5 +1475,7 @@ namespace Email2CXM.Helpers
         public String AutoResponseTableTest { get; set; }
         public String MyCouncilTestEndPoint { get; set; }
         public String MyCouncilLiveEndPoint { get; set; }
+        public String commonSignaturesTableTest { get; set; }
+        public String commonSignaturesTableLive { get; set; }
     }
 }
