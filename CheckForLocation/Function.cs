@@ -556,12 +556,23 @@ namespace CheckForLocation
                 }
                 else
                 {
+                    //Working out Location and Service Area
+                    Boolean locationFromSubjectLine = false;
                     String searchText = caseDetails.enquiryDetails;
+                    //Find Location
                     if (caseDetails.customerHasUpdated)
                     {
                         searchText = caseDetails.fullEmail + " " + caseDetails.enquiryDetails;
                     }
-                    sovereignLocation = await CheckForLocationAsync(caseDetails.Subject + " " + searchText);
+                    sovereignLocation = await CheckForLocationAsync(caseDetails.Subject);
+                    if(sovereignLocation.Success)
+                    {
+                        locationFromSubjectLine= true;  
+                    }
+                    else
+                    {
+                        sovereignLocation = await CheckForLocationAsync(searchText);
+                    }
                     if (caseDetails.contactUs && !sovereignLocation.Success)
                     {
                         Console.WriteLine("INFO : Checking for Location Using customerAddress : " + caseDetails.customerAddress);
@@ -569,7 +580,7 @@ namespace CheckForLocation
                     }
                     String service = "";
                     district = caseDetails.District;
-
+                    //Find Service
                     if (caseDetails.contactUs && !String.IsNullOrEmpty(caseDetails.sovereignServiceArea))
                     {
                         Console.WriteLine(caseReference + " : SovereignServiceArea set using  : " + caseDetails.sovereignServiceArea);
@@ -579,7 +590,7 @@ namespace CheckForLocation
                     {
                         Console.WriteLine(caseReference + " : SovereignServiceArea not set using Lex ");
                         try {
-                            if (!caseDetails.Subject.ToLower().Contains("council form has been submitted"))
+                            if (!caseDetails.Subject.ToLower().Contains("council form has been submitted")&&!locationFromSubjectLine)
                             {
                                 service = await GetServiceAsync(caseDetails.Subject, true);
                             }
