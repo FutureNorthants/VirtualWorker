@@ -1930,7 +1930,7 @@ namespace CheckForLocation
             }
             else
             {
-                if (caseDetails.proposedResponseConfidence > minAutoRespondLevel)
+                if (caseDetails.proposedResponseConfidence >= minAutoRespondLevel)
                 {
                     cxmPayload = new Dictionary<string, string>
                     {
