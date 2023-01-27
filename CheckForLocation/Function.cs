@@ -864,7 +864,7 @@ namespace CheckForLocation
             return emailBody;
         }
 
-        private async Task<Location> CheckForLocationAsync(String emailBody)
+        public async Task<Location> CheckForLocationAsync(String emailBody)
         {
             Console.WriteLine("INFO : Checking for Location");
             emailBody = emailBody.Replace("\n", " ");
@@ -1348,7 +1348,7 @@ namespace CheckForLocation
             }
         }
 
-        private async Task<String> NNCGetSovereignEmailFromDynamoAsync(String sovereignName)
+        public async Task<String> NNCGetSovereignEmailFromDynamoAsync(String sovereignName)
         {
             try
             {
