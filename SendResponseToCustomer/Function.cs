@@ -40,6 +40,7 @@ namespace SendResponseToCustomer
         private static string dynamoTable;
         private static string sqsEmailURL;
         private static string templateBucket;
+        private static String persona;
         private Boolean liveInstance = false;
         private Boolean west = true;
 
@@ -51,6 +52,16 @@ namespace SendResponseToCustomer
             if (await GetSecrets())
             {
                 Boolean suppressResponse = false;
+
+                Random randonNumber = new Random();
+                if (randonNumber.Next(0, 2) == 0)
+                {
+                    persona = secrets.botPersona1;
+                }
+                else
+                {
+                    persona = secrets.botPersona2;
+                }
 
                 JObject o = JObject.Parse(input.ToString());
                 caseReference = (string)o.SelectToken("CaseReference");
@@ -311,7 +322,15 @@ namespace SendResponseToCustomer
                 emailBody = emailBody.Replace("CCC", HttpUtility.HtmlEncode(caseDetails.contactResponse));
                 emailBody = emailBody.Replace("DDD", HttpUtility.HtmlEncode(caseDetails.customerName));
                 emailBody = emailBody.Replace("FFF", HttpUtility.HtmlEncode(await GetContactFromDynamoAsync(caseReference)));
-                emailBody = emailBody.Replace("NNN", HttpUtility.HtmlEncode(caseDetails.staffName));
+                if (caseDetails.staffName is null) 
+                { 
+                    emailBody = emailBody = emailBody.Replace("NNN", HttpUtility.HtmlEncode(persona));
+                } 
+                else
+                {
+                    emailBody = emailBody.Replace("NNN", HttpUtility.HtmlEncode(caseDetails.staffName));
+                }
+                
             }
             catch (Exception error)
             {
@@ -516,5 +535,7 @@ namespace SendResponseToCustomer
         public string nncEMNCasesTest { get; set; }
         public string nncTemplateBucketLive { get; set; }
         public string nncTemplateBucketTest { get; set; }
+        public String botPersona1 { get; set; }
+        public String botPersona2 { get; set; }
     }
 }

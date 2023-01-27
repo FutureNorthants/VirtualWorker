@@ -21,6 +21,7 @@ using Amazon.SecretsManager.Model;
 using System.Linq;
 using HtmlAgilityPack;
 using System.Text.Encodings.Web;
+using Amazon.DynamoDBv2.DataModel;
 
 namespace Email2CXM.Helpers
 {
@@ -55,6 +56,7 @@ namespace Email2CXM.Helpers
         public string telNo { get; set; } = null;
         public string address { get; set; } = null;
         public string ContactUsTableMapping { get; set; } = null;
+        public string commonSignaturesTableName { get; set; } = null;   
 
         private string MyCouncilEndPoint = "";
 
@@ -196,6 +198,7 @@ namespace Email2CXM.Helpers
                         if (liveInstance)
                         {
                             MyCouncilEndPoint = secrets.MyCouncilLiveEndPoint;
+                            commonSignaturesTableName = secrets.commonSignaturesTableLive;
                             if (west)
                             {
                                 cxmEndPoint = secrets.cxmEndPointLive;
@@ -221,6 +224,7 @@ namespace Email2CXM.Helpers
                         else  
                         {
                             MyCouncilEndPoint = secrets.MyCouncilTestEndPoint;
+                            commonSignaturesTableName = secrets.commonSignaturesTableTest;
                             if (west)
                             {
                                 cxmEndPoint = secrets.cxmEndPointTest;
@@ -261,6 +265,7 @@ namespace Email2CXM.Helpers
 
                     try
                     {
+                        await GetCommonSignaturesAsync(emailContents);
                         String corporateSignature = await GetSignatureFromDynamoAsync(secrets.homeDomain, "");
                         int corporateSignatureLocation = emailContents.IndexOf(corporateSignature);
                         if (corporateSignatureLocation > 0)
@@ -884,6 +889,30 @@ namespace Email2CXM.Helpers
                 return mycouncilCase;
             }
         }
+        // TODO common signatures 
+        private async Task<String> GetCommonSignaturesAsync(String emailContents)
+        {
+            AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(primaryRegion);
+
+            ScanRequest request = new ScanRequest
+            {
+                TableName = commonSignaturesTableName,
+            };
+
+            ScanResponse response = await dynamoDBClient.ScanAsync(request);
+
+            foreach (Dictionary<string, AttributeValue> item in response.Items)
+            {
+                string signature = item["signature"].S;
+                int signatureLocation = emailContents.ToLower().IndexOf(signature);
+                if (signatureLocation > 0)
+                {
+                    emailContents = emailContents.Remove(signatureLocation);
+                }
+
+            }
+            return emailContents;
+        }
 
             private async Task<String> GetSignatureFromDynamoAsync(String domain, String sigSuffix)
         {
@@ -1446,5 +1475,7 @@ namespace Email2CXM.Helpers
         public String AutoResponseTableTest { get; set; }
         public String MyCouncilTestEndPoint { get; set; }
         public String MyCouncilLiveEndPoint { get; set; }
+        public String commonSignaturesTableTest { get; set; }
+        public String commonSignaturesTableLive { get; set; }
     }
 }

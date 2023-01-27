@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -555,12 +556,23 @@ namespace CheckForLocation
                 }
                 else
                 {
+                    //Working out Location and Service Area
+                    Boolean locationFromSubjectLine = false;
                     String searchText = caseDetails.enquiryDetails;
+                    //Find Location
                     if (caseDetails.customerHasUpdated)
                     {
                         searchText = caseDetails.fullEmail + " " + caseDetails.enquiryDetails;
                     }
-                    sovereignLocation = await CheckForLocationAsync(caseDetails.Subject + " " + searchText);
+                    sovereignLocation = await CheckForLocationAsync(caseDetails.Subject);
+                    if(sovereignLocation.Success)
+                    {
+                        locationFromSubjectLine= true;  
+                    }
+                    else
+                    {
+                        sovereignLocation = await CheckForLocationAsync(searchText);
+                    }
                     if (caseDetails.contactUs && !sovereignLocation.Success)
                     {
                         Console.WriteLine("INFO : Checking for Location Using customerAddress : " + caseDetails.customerAddress);
@@ -568,7 +580,7 @@ namespace CheckForLocation
                     }
                     String service = "";
                     district = caseDetails.District;
-
+                    //Find Service
                     if (caseDetails.contactUs && !String.IsNullOrEmpty(caseDetails.sovereignServiceArea))
                     {
                         Console.WriteLine(caseReference + " : SovereignServiceArea set using  : " + caseDetails.sovereignServiceArea);
@@ -578,7 +590,7 @@ namespace CheckForLocation
                     {
                         Console.WriteLine(caseReference + " : SovereignServiceArea not set using Lex ");
                         try {
-                            if (!caseDetails.Subject.ToLower().Contains("council form has been submitted"))
+                            if (!caseDetails.Subject.ToLower().Contains("council form has been submitted")&&!locationFromSubjectLine)
                             {
                                 service = await GetServiceAsync(caseDetails.Subject, true);
                             }
@@ -870,12 +882,17 @@ namespace CheckForLocation
             {
                 MatchCollection matches = Regex.Matches(emailBody, regString);
 
-                foreach (Match match in matches)
+                for (int currentPostcode = 0; currentPostcode < matches.Count; currentPostcode++)
                 {
+                    Boolean lastEntry = false;
+                    if (currentPostcode == matches.Count - 1)
+                    {
+                        lastEntry = true;
+                    }
                     sovereignLocation.PostcodeFound = true;
-                    GroupCollection groups = match.Groups;
+                    GroupCollection groups = matches[currentPostcode].Groups;
                     Console.WriteLine(caseReference + " : INFO : CheckPostcode input : " + groups[0].Value);
-                    Postcode postCodeData = await CheckPostcode(groups[0].Value);
+                    Postcode postCodeData = await CheckPostcode(groups[0].Value,lastEntry);
                     Console.WriteLine(caseReference + " : INFO : CheckPostcode response : " + postCodeData.success);
                     try
                     {
@@ -889,6 +906,26 @@ namespace CheckForLocation
                     }
                     catch (Exception) { }
                 }
+
+                //foreach (Match match in matches)
+                //{
+                //    sovereignLocation.PostcodeFound = true;
+                //    GroupCollection groups = match.Groups;
+                //    Console.WriteLine(caseReference + " : INFO : CheckPostcode input : " + groups[0].Value);
+                //    Postcode postCodeData = await CheckPostcode(groups[0].Value);
+                //    Console.WriteLine(caseReference + " : INFO : CheckPostcode response : " + postCodeData.success);
+                //    try
+                //    {
+                //        if (postCodeData.success)
+                //        {
+                //            sovereignLocation.SovereignCouncilName = postCodeData.SovereignCouncilName;
+                //            sovereignLocation.sovereignWest = postCodeData.west;
+                //            sovereignLocation.Success = true;
+                //            return sovereignLocation;
+                //        }
+                //    }
+                //    catch (Exception) { }
+                //}
             }
 
             if (sovereignLocation.PostcodeFound)
@@ -1018,9 +1055,12 @@ namespace CheckForLocation
             return sovereignLocation;
         }
 
-        private async Task<Postcode> CheckPostcode(String postcode)
+        private async Task<Postcode> CheckPostcode(String postcode, Boolean lastEntry)
         {
             Postcode postCodeData = new Postcode();
+
+            Regex rgx = new Regex("[^a-zA-Z0-9 -]");
+            postcode = rgx.Replace(postcode, "");
 
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, postCodeURL + postcode.Replace(" ", ""));
 
@@ -1102,7 +1142,10 @@ namespace CheckForLocation
             else
             {
                 postCodeData.success = false;
-                UpdateCaseString("email-comments",  "Postcode API failed - assigned to staff");
+                if (lastEntry)
+                {
+                    UpdateCaseString("email-comments", "Postcode API failed - assigned to staff");
+                }             
             }
             return postCodeData;
         }
@@ -1431,8 +1474,15 @@ namespace CheckForLocation
                     }
                     else
                     {
+                        if(useProposedResponse)
+                        {
+                            forwardFileName = "email-sovereign-forward-inc-response.txt";
+                        }
+                        else
+                        {
+                            forwardFileName = "email-sovereign-forward.txt";
+                        }
                         Console.WriteLine(caseReference + " : Email case");
-                        forwardFileName = "email-sovereign-forward.txt";
                     }
                     //TODO this is where email forwarding happens
                     emailBody = await FormatEmailAsync(caseDetails, forwardFileName);
@@ -1613,9 +1663,11 @@ namespace CheckForLocation
             using AmazonSimpleEmailServiceClient client = new AmazonSimpleEmailServiceClient(RegionEndpoint.EUWest1);
             try
             {
-                SendRawEmailRequest sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, bccAddress, includeOriginalEmail)) };
-                //sendRequest.Source = "norbert@wnc.northampton.digital";
-                //sendRequest.ReturnPathArn = "arn:aws:ses:eu-west-1:898823515462:identity/northampton.digital";
+                SendRawEmailRequest sendRequest = new SendRawEmailRequest
+                {
+                    RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, bccAddress, includeOriginalEmail)),
+                    ConfigurationSetName = "AllMail"
+                };
                 SendRawEmailResponse response = await client.SendRawEmailAsync(sendRequest);
                 return true;
             }
@@ -1652,7 +1704,7 @@ namespace CheckForLocation
             message.To.Add(new MailboxAddress(string.Empty, toAddress));
             message.Bcc.Add(new MailboxAddress(string.Empty, bccAddress));
             message.Subject = subject;
-            message.Headers.Add(new Header("Return-Path", "norbert@northampton.digital"));
+           // message.Headers.Add(new Header("Return-Path", "norbert@northampton.digital"));
 
             try
             {
@@ -1792,6 +1844,10 @@ namespace CheckForLocation
                     case "east_northants":
                         caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "ENC", qnaResponse.answers[0].metadata);
                         break;
+                    case "northamptonshire":
+                        caseDetails.proposedResponse = qnaResponse.answers[0].answer;
+                        break;
+
                     default:
                         await SendFailureAsync("Unexpected sovereign council : " + caseDetails.sovereignCouncil,"QNA Error");
                         Console.WriteLine("ERROR : Unexpected sovereign council : " + caseDetails.sovereignCouncil);
@@ -1924,9 +1980,9 @@ namespace CheckForLocation
             if (caseDetails.proposedResponseConfidence < minConfidenceLevel)
             {
                 cxmPayload = new Dictionary<string, string>
-                {
-                    { "response-confidence", caseDetails.proposedResponseConfidence.ToString()}
-                };
+                    {
+                        { "response-confidence", caseDetails.proposedResponseConfidence.ToString()}
+                    };
             }
             else
             {
