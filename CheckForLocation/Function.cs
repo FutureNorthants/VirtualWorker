@@ -1,6 +1,8 @@
 using Amazon;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
+using Amazon.Kendra;
+using Amazon.Kendra.Model;
 using Amazon.Lambda.Core;
 using Amazon.Lex;
 using Amazon.Lex.Model;
@@ -15,6 +17,7 @@ using Amazon.StepFunctions.Model;
 using MimeKit;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Org.BouncyCastle.Bcpg;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -46,6 +49,7 @@ namespace CheckForLocation
         private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
         private static readonly RegionEndpoint bucketRegion = RegionEndpoint.EUWest2;
         private static RegionEndpoint emailsRegion = RegionEndpoint.EUWest1;
+        private static RegionEndpoint kendraRegion = RegionEndpoint.EUWest1;
         private static readonly String secretName = "nbcGlobal";
         private static readonly String secretAlias = "AWSCURRENT";
 
@@ -354,7 +358,7 @@ namespace CheckForLocation
             return links;
         }
 
-        private async Task<Boolean> GetSecrets()
+        public async Task<Boolean> GetSecrets()
         {
             IAmazonSecretsManager client = new AmazonSecretsManagerClient(primaryRegion);
 
@@ -481,9 +485,111 @@ namespace CheckForLocation
             return caseDetails;
         }
 
+        private async Task<Boolean> GetProposedResponse(CaseDetails caseDetails, String QNAurl, String QNAauth)
+        {
+            try
+            {
+                HttpClient qnaClient = new HttpClient();
+                qnaClient.DefaultRequestHeaders.Add("Authorization", secrets.QNAauth);
+                HttpResponseMessage responseMessage = await qnaClient.PostAsync(
+                     secrets.QNAurl,
+                     new StringContent("{'question':'" + HttpUtility.UrlEncode(caseDetails.customerContact) + "'}", Encoding.UTF8, "application/json"));
+                responseMessage.EnsureSuccessStatusCode();
+                string responseBody = await responseMessage.Content.ReadAsStringAsync();
+                dynamic jsonResponse = JObject.Parse(responseBody);
+                QNAResponse qnaResponse = System.Text.Json.JsonSerializer.Deserialize<QNAResponse>(responseBody);
+
+                switch (caseDetails.sovereignCouncil.ToLower())
+                {
+                    case "northampton":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "NBC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "daventry":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "DDC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "south_northants":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "SNC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "corby":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "CBC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "kettering":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "KBC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "wellingborough":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "BCW", qnaResponse.answers[0].metadata);
+                        break;
+                    case "east_northants":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "ENC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "northamptonshire":
+                        caseDetails.proposedResponse = qnaResponse.answers[0].answer;
+                        break;
+
+                    default:
+                        await SendFailureAsync("Unexpected sovereign council : " + caseDetails.sovereignCouncil, "QNA Error");
+                        Console.WriteLine("ERROR : Unexpected sovereign council : " + caseDetails.sovereignCouncil);
+                        return false;
+                }
+                //caseDetails.proposedResponse = jsonResponse.answers[0].answer;
+                int score = 0;
+                try
+                {
+                    if (Int32.TryParse(((String)(jsonResponse.answers[0].score)).Split('.')[0], out score))
+                    {
+                        caseDetails.proposedResponseConfidence = score;
+                    }
+                    else
+                    {
+                        await SendFailureAsync("qna Score not numeric : " + jsonResponse.answers[0].score, "QNA Error");
+                        Console.WriteLine("ERROR : qna Score not numeric : " + jsonResponse.answers[0].score);
+                        return false;
+                    }
+                }
+                catch (Exception error)
+                {
+                    await SendFailureAsync("qna Score Parse Error : " + jsonResponse.answers[0].score, error.Message);
+                    Console.WriteLine("ERROR : qna Score Parse Error : " + jsonResponse.answers[0].score + " : " + error.Message);
+                    return false;
+                }
+                if (!await UpdateCaseDetailsAsync(caseDetails))
+                {
+                    UpdateCaseString("contact-response", "invalid FAQ response");
+                }
+                return true;
+            }
+            catch (Exception error)
+            {
+                await SendFailureAsync("qna api error", error.Message);
+                Console.WriteLine("qna api error", error.Message);
+                return false;
+            }
+        }
+
+
+        public async Task<String> GetResponseFromKendraAsync(String accessKey, String secret, String indexID, String query)
+        {
+            AmazonKendraClient client = new AmazonKendraClient(accessKey, secret, kendraRegion);
+            Amazon.Kendra.Model.QueryRequest request = new Amazon.Kendra.Model.QueryRequest()
+            {
+                IndexId = indexID,
+                QueryText = query
+            };
+            Amazon.Kendra.Model.QueryResponse response = await client.QueryAsync(request);
+            if (response.TotalNumberOfResults > 0)
+            {
+                return response.ResultItems[0].DocumentExcerpt.Text;
+            }
+            else 
+            {
+                throw new ApplicationException("No valid reponse found");
+            } 
+        }
+
         private async Task<Boolean> ProcessCaseAsync(CaseDetails caseDetails)
         {
             Boolean success = true;
+            Boolean useKendra = false;
             try
             {
                 if (String.IsNullOrEmpty(caseDetails.enquiryDetails))
@@ -494,6 +600,11 @@ namespace CheckForLocation
                 if (reopened && !caseDetails.Redirected)
                 {
                     return await UpdateClosedCaseAsync();
+                }
+
+                if(caseDetails.Subject.ToLower().Contains("kendra"))
+                {
+                    useKendra = true;
                 }
 
                 if (caseDetails.manualReview && west)
@@ -658,17 +769,61 @@ namespace CheckForLocation
                             {
                                 UpdateCaseBoolean("unitary", false);
                                 UpdateCaseString("email-comments", "Transitioning case to local process");
-                                await GetProposedResponse(caseDetails, secrets.nbcQNAurl, secrets.nbcQNAauth);
+                                if(useKendra)
+                                {
+                                    try
+                                    {
+                                        caseDetails.proposedResponse = await GetResponseFromKendraAsync(secrets.WNCProdAccessKey,secrets.WNCProdSecretAccessKey, secrets.KendraIndex, caseDetails.customerContact);
+                                        caseDetails.proposedResponseConfidence = 100;
+                                        if (!await UpdateCaseDetailsAsync(caseDetails))
+                                        {
+                                            UpdateCaseString("contact-response", "invalid FAQ response");
+                                        }
+                                    }
+                                    catch(ApplicationException) { } 
+                                    catch(Exception error) 
+                                    {
+                                        Console.WriteLine("ERROR : " + caseReference + " : Using Kendra : " +  error.Message);
+                                        Console.WriteLine("ERROR : " + caseReference + " : Using Kendra : " + error.StackTrace);
+                                    }                                
+                                }
+                                else
+                                {
+                                    await GetProposedResponse(caseDetails, secrets.nbcQNAurl, secrets.nbcQNAauth);
+                                }                              
                                 await TransitionCaseAsync("awaiting-review");
                             }
                             else
                             {
-                                await GetProposedResponse(caseDetails, secrets.QNAurl, secrets.QNAauth);
                                 Boolean includeProposedResponse = false;
-                                if (caseDetails.proposedResponseConfidence >= minConfidenceLevel)
+                                if (useKendra)
                                 {
-                                    includeProposedResponse = true;
+                                    try
+                                    {
+                                        caseDetails.proposedResponse = "Response from Kendra : " + await GetResponseFromKendraAsync(secrets.WNCProdAccessKey, secrets.WNCProdSecretAccessKey, secrets.KendraIndex, caseDetails.customerContact);
+                                        caseDetails.proposedResponseConfidence = 100;
+                                        includeProposedResponse = true;
+                                        if (!await UpdateCaseDetailsAsync(caseDetails))
+                                        {
+                                            UpdateCaseString("contact-response", "invalid FAQ response");
+                                        }
+                                    }
+                                    catch (ApplicationException) { }
+                                    catch (Exception error)
+                                    {
+                                        Console.WriteLine("ERROR : " + caseReference + " : Using Kendra : " + error.Message);
+                                        Console.WriteLine("ERROR : " + caseReference + " : Using Kendra : " + error.StackTrace);
+                                    }
                                 }
+                                else
+                                {
+                                    await GetProposedResponse(caseDetails, secrets.QNAurl, secrets.QNAauth);                                  
+                                    if (caseDetails.proposedResponseConfidence >= minConfidenceLevel)
+                                    {
+                                        includeProposedResponse = true;
+                                    }
+                                }
+                                //                              
                                 if (caseDetails.proposedResponseConfidence >= minAutoRespondLevel)
                                 {
                                     UpdateCaseString("email-comments", "Automated Response");
@@ -1807,87 +1962,7 @@ namespace CheckForLocation
                 return await TransitionCaseAsync("hub-awaiting-review");
             }
         }
-        private async Task<Boolean> GetProposedResponse(CaseDetails caseDetails, String QNAurl, String QNAauth)
-        {
-            try
-            {
-                HttpClient qnaClient = new HttpClient();
-                qnaClient.DefaultRequestHeaders.Add("Authorization", secrets.QNAauth);
-                HttpResponseMessage responseMessage = await qnaClient.PostAsync(
-                     secrets.QNAurl,
-                     new StringContent("{'question':'" + HttpUtility.UrlEncode(caseDetails.customerContact) + "'}", Encoding.UTF8, "application/json"));
-                responseMessage.EnsureSuccessStatusCode();
-                string responseBody = await responseMessage.Content.ReadAsStringAsync();
-                dynamic jsonResponse = JObject.Parse(responseBody);
-                QNAResponse qnaResponse = System.Text.Json.JsonSerializer.Deserialize<QNAResponse>(responseBody);
- 
-                switch (caseDetails.sovereignCouncil.ToLower())
-                {
-                    case "northampton":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "NBC", qnaResponse.answers[0].metadata);
-                        break;
-                    case "daventry":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "DDC", qnaResponse.answers[0].metadata);
-                        break;
-                    case "south_northants":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "SNC", qnaResponse.answers[0].metadata);
-                        break;
-                    case "corby":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "CBC", qnaResponse.answers[0].metadata);
-                        break;
-                    case "kettering":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "KBC", qnaResponse.answers[0].metadata);
-                        break;
-                    case "wellingborough":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "BCW", qnaResponse.answers[0].metadata);
-                        break;
-                    case "east_northants":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "ENC", qnaResponse.answers[0].metadata);
-                        break;
-                    case "northamptonshire":
-                        caseDetails.proposedResponse = qnaResponse.answers[0].answer;
-                        break;
-
-                    default:
-                        await SendFailureAsync("Unexpected sovereign council : " + caseDetails.sovereignCouncil,"QNA Error");
-                        Console.WriteLine("ERROR : Unexpected sovereign council : " + caseDetails.sovereignCouncil);
-                        return false;
-                }
-                //caseDetails.proposedResponse = jsonResponse.answers[0].answer;
-                int score = 0;
-                try
-                {
-                    if (Int32.TryParse(((String)(jsonResponse.answers[0].score)).Split('.')[0], out score))
-                    {
-                        caseDetails.proposedResponseConfidence = score;
-                    }
-                    else
-                    {
-                        await SendFailureAsync("qna Score not numeric : " + jsonResponse.answers[0].score, "QNA Error");
-                        Console.WriteLine("ERROR : qna Score not numeric : " + jsonResponse.answers[0].score);
-                        return false;
-                    }
-                }
-                catch (Exception error)
-                {
-                    await SendFailureAsync("qna Score Parse Error : " + jsonResponse.answers[0].score, error.Message);
-                    Console.WriteLine("ERROR : qna Score Parse Error : " + jsonResponse.answers[0].score + " : " + error.Message);
-                    return false;
-                }
-                if (!await UpdateCaseDetailsAsync(caseDetails))
-                {
-                    UpdateCaseString("contact-response", "invalid FAQ response");
-                }
-                return true;
-            }
-            catch (Exception error)
-            {
-                await SendFailureAsync("qna api error" , error.Message);
-                Console.WriteLine("qna api error", error.Message);
-                return false;
-            }
-        }
-
+       
         private async Task<String> ReplaceResponseTags(String response, String sovereign, Metadata[] tags)
         {
             try
@@ -2112,6 +2187,9 @@ public class Secrets
     public String minResponseConfidenceLevel { get; set; }
     public String minAutoResponseLevelTest { get; set; }
     public String minAutoResponseLevelLive { get; set; }
+    public String WNCProdAccessKey { get; set; }
+    public String WNCProdSecretAccessKey { get; set; }
+    public String KendraIndex { get; set; } 
 }
 
 public class Location
