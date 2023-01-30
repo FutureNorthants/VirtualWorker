@@ -23,11 +23,9 @@ public class FunctionTest
     [Fact]
     public async Task TestKendraAsync() 
     {
-        Secrets secrets = null;
         Function function = new Function();
         await function.GetSecrets();
-        Console.WriteLine("CP1" + secrets?.WNCProdAccessKey);
-        Assert.Contains("We aim to have claims",await function.GetResponseFromKendraAsync(secrets?.WNCProdAccessKey, secrets?.WNCProdSecretAccessKey, secrets?.KendraIndex,"how long will it take for my benefit claim to be processed"));
+        Assert.Contains("We aim to have claims",await function.GetResponseFromKendraAsync(function.secrets?.WNCProdAccessKey, function.secrets?.WNCProdSecretAccessKey, function.secrets?.KendraIndex,"how long will it take for my benefit claim to be processed"));
     }
 
 }

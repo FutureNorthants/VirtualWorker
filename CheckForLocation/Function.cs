@@ -78,7 +78,7 @@ namespace CheckForLocation
         private Boolean defaultRouting = false;
         private Boolean outOfArea = false;
         private Boolean reopened = false;
-        private Secrets secrets = null;
+        public Secrets secrets = null;
 
         private Location sovereignLocation;
         readonly MemoryStream memoryStream = new MemoryStream();
