@@ -3,12 +3,11 @@ using Amazon.Lambda.Core;
 using Amazon.Lambda.TestUtilities;
 using Amazon.Lambda.APIGatewayEvents;
 
-
 namespace CheckForLocation.Tests;
 
 public class FunctionTest
 {
-    public FunctionTest(){}
+    public FunctionTest() { }
 
     [Fact]
     public async void TestLocations()
@@ -20,4 +19,13 @@ public class FunctionTest
         Assert.True(location.sovereignWest);
         Assert.False(location.PostcodeFound);
     }
+
+    [Fact]
+    public async Task TestKendraAsync() 
+    {
+        Function function = new Function();
+        await function.GetSecrets();
+        Assert.Contains("We aim to have claims",await function.GetResponseFromKendraAsync(function.secrets?.WNCProdAccessKey, function.secrets?.WNCProdSecretAccessKey, function.secrets?.KendraIndex,"how long will it take for my benefit claim to be processed"));
+    }
+
 }
