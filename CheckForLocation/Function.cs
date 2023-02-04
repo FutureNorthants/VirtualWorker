@@ -615,7 +615,7 @@ namespace CheckForLocation
                         forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
                         defaultRouting = true;
                     }
-                    success = await SendEmails(caseDetails, forwardingEmailAddress, true, false);
+                    success = await SendEmails(caseDetails, forwardingEmailAddress, true, true, false);
                     if (success)
                     {
                         caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
@@ -639,7 +639,7 @@ namespace CheckForLocation
                             forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
                             defaultRouting = true;
                         }
-                        success = await SendEmails(caseDetails, forwardingEmailAddress, true, false);
+                        success = await SendEmails(caseDetails, forwardingEmailAddress, true, true, false);
                         if (success)
                         {
                             caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
@@ -652,12 +652,12 @@ namespace CheckForLocation
                         if (!String.IsNullOrEmpty(caseDetails.forward))
                         {
                             String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
-                            success = await SendEmails(caseDetails, forwardingEmailAddress, replyToCustomer, false);
+                            success = await SendEmails(caseDetails, forwardingEmailAddress, replyToCustomer, true, false);
                             replyToCustomer = false;
                         }
                         if (!String.IsNullOrEmpty(caseDetails.nncForwardEMailTo))
                         {
-                            success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer, false);
+                            success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer, true, false);
                         }
                     }
                     if (success)
@@ -833,18 +833,19 @@ namespace CheckForLocation
                                 {
                                     if (sovereignLocation.SovereignCouncilName.Equals("east_northants"))
                                     {
+                                        success = await SendEmails(caseDetails, null, true, false, includeProposedResponse);
                                         await TransitionCaseAsync("hub-awaiting-review");
                                     }
                                     else
                                     {
-                                        success = await SendEmails(caseDetails, forwardingEmailAddress, true, includeProposedResponse);
+                                        success = await SendEmails(caseDetails, forwardingEmailAddress, true, true, includeProposedResponse);
                                         UpdateCaseString("email-comments", "Closing case");
                                         await TransitionCaseAsync("close-case");
                                     }                                 
                                 }
                                 else
                                 {                                   
-                                    success = await SendEmails(caseDetails, forwardingEmailAddress, true, includeProposedResponse);
+                                    success = await SendEmails(caseDetails, forwardingEmailAddress, true, true, includeProposedResponse);
                                     Console.WriteLine(caseReference + " : Finished sending emails");
                                     UpdateCaseString("email-comments", "Closing case");
                                     Console.WriteLine(caseReference + " : Finished updating case");
@@ -1558,7 +1559,7 @@ namespace CheckForLocation
 
         }
 
-        private async Task<Boolean> SendEmails(CaseDetails caseDetails, String forwardingEmailAddress, Boolean replyToCustomer, Boolean useProposedResponse)
+        private async Task<Boolean> SendEmails(CaseDetails caseDetails, String forwardingEmailAddress, Boolean replyToCustomer, Boolean forward, Boolean useProposedResponse)
         {
             try
             {
@@ -1607,69 +1608,73 @@ namespace CheckForLocation
 
                 Console.WriteLine(caseReference + " : Sending forward email");
 
-                if (west && caseDetails.sovereignCouncil.ToLower().Equals("northampton") && defaultRouting)
+                if (forward)
                 {
-                    Console.WriteLine(caseReference + " : Local default case no forward necessary");
-                }
-                else
-                {
-                    Console.WriteLine(caseReference + " : Preparing to forward email");
-                    String forwardFileName = "";
-                    if (caseDetails.contactUs)
+                    if (west && caseDetails.sovereignCouncil.ToLower().Equals("northampton") && defaultRouting)
                     {
-                        Console.WriteLine(caseReference + " : ContactUs case");
-                        if (useProposedResponse)
-                        {
-                            forwardFileName = "email-sovereign-forward-contactus-incresponse.txt";
-                        }
-                        else
-                        {
-                            forwardFileName = "email-sovereign-forward-contactus.txt";
-                        }
+                        Console.WriteLine(caseReference + " : Local default case no forward necessary");
                     }
                     else
                     {
-                        if(useProposedResponse)
+                        Console.WriteLine(caseReference + " : Preparing to forward email");
+                        String forwardFileName = "";
+                        if (caseDetails.contactUs)
                         {
-                            forwardFileName = "email-sovereign-forward-inc-response.txt";
+                            Console.WriteLine(caseReference + " : ContactUs case");
+                            if (useProposedResponse)
+                            {
+                                forwardFileName = "email-sovereign-forward-contactus-incresponse.txt";
+                            }
+                            else
+                            {
+                                forwardFileName = "email-sovereign-forward-contactus.txt";
+                            }
                         }
                         else
                         {
-                            forwardFileName = "email-sovereign-forward.txt";
-                        }
-                        Console.WriteLine(caseReference + " : Email case");
-                    }
-                    //TODO this is where email forwarding happens
-                    emailBody = await FormatEmailAsync(caseDetails, forwardFileName);
-                    Console.WriteLine(caseReference + " : Email contents set");
-                    if (!String.IsNullOrEmpty(emailBody))
-                    {
-                        String subjectPrefix = "";
-                        if (!liveInstance)
-                        {
-                            if (!String.IsNullOrEmpty(caseDetails.forward))
+                            if (useProposedResponse)
                             {
-                                subjectPrefix = "(" + caseDetails.forward + ") ";
+                                forwardFileName = "email-sovereign-forward-inc-response.txt";
                             }
-                            subjectPrefix += "TEST - ";
+                            else
+                            {
+                                forwardFileName = "email-sovereign-forward.txt";
+                            }
+                            Console.WriteLine(caseReference + " : Email case");
                         }
-                        if (!await SendEmailAsync(secrets.OrganisationNameShort, norbertSendFrom, forwardingEmailAddress.ToLower(), bccEmailAddress, subjectPrefix + "Hub case reference number is " + caseReference, caseDetails.emailID, emailBody, "", true))
+                        //TODO this is where email forwarding happens
+                        emailBody = await FormatEmailAsync(caseDetails, forwardFileName);
+                        Console.WriteLine(caseReference + " : Email contents set");
+                        if (!String.IsNullOrEmpty(emailBody))
                         {
-                            Console.WriteLine(caseReference + " : ERROR : Failed to forward email");
+                            String subjectPrefix = "";
+                            if (!liveInstance)
+                            {
+                                if (!String.IsNullOrEmpty(caseDetails.forward))
+                                {
+                                    subjectPrefix = "(" + caseDetails.forward + ") ";
+                                }
+                                subjectPrefix += "TEST - ";
+                            }
+                            if (!await SendEmailAsync(secrets.OrganisationNameShort, norbertSendFrom, forwardingEmailAddress.ToLower(), bccEmailAddress, subjectPrefix + "Hub case reference number is " + caseReference, caseDetails.emailID, emailBody, "", true))
+                            {
+                                Console.WriteLine(caseReference + " : ERROR : Failed to forward email");
+                                UpdateCaseString("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
+                                return false;
+                            }
+                            Console.WriteLine(caseReference + " : Forwarded email");
+                            UpdateCaseString("email-comments", "Forwarded email to " + forwardingEmailAddress.ToLower());
+                        }
+                        else
+                        {
+                            Console.WriteLine(caseReference + "ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
                             UpdateCaseString("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
+                            await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
                             return false;
                         }
-                        Console.WriteLine(caseReference + " : Forwarded email");
-                        UpdateCaseString("email-comments", "Forwarded email to " + forwardingEmailAddress.ToLower());
-                    }
-                    else
-                    {
-                        Console.WriteLine(caseReference + "ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
-                        UpdateCaseString("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
-                        await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
-                        return false;
                     }
                 }
+               
                 Console.WriteLine(caseReference + " : SendEmails Ended");
                 return true;
             }
@@ -1859,9 +1864,7 @@ namespace CheckForLocation
             message.To.Add(new MailboxAddress(string.Empty, toAddress));
             message.Bcc.Add(new MailboxAddress(string.Empty, bccAddress));
             message.Subject = subject;
-           // message.Headers.Add(new Header("Return-Path", "norbert@northampton.digital"));
-
-            try
+             try
             {
                 message = await GetMessageBodyAsync(message, emailID, htmlBody, includeOriginalEmail);
                 return message;
