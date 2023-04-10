@@ -25,7 +25,9 @@ public class FunctionTest
     {
         Function function = new Function();
         await function.GetSecrets();
-        Assert.Contains("We aim to have claims",await function.GetResponseFromKendraAsync(function.secrets?.WNCProdAccessKey, function.secrets?.WNCProdSecretAccessKey, function.secrets?.KendraIndex,"how long will it take for my benefit claim to be processed"));
+        KendraResponse response = await function.GetResponseFromKendraAsync(function.secrets?.WNCProdAccessKey, function.secrets?.WNCProdSecretAccessKey, function.secrets?.KendraIndex, "how long will it take for my benefit claim to be processed");
+        Assert.Contains("We aim to have claims",response.response);
+        Assert.Equal("VERY_HIGH", response.confidence);
     }
 
 }

@@ -176,6 +176,8 @@ namespace Email2CXM.Helpers
                         {
                             HtmlDocument emailHTML = new HtmlDocument();
                             String htmlBody = message.HtmlBody.Replace("<br/>", "\r\n");
+                            htmlBody = htmlBody.Replace("<br>", "\r\n");
+                            htmlBody = htmlBody.Replace("&nbsp", " ");
                             emailHTML.LoadHtml(htmlBody);
                             emailContents = emailHTML.DocumentNode.InnerText;
                         }
