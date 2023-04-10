@@ -567,7 +567,7 @@ namespace CheckForLocation
         }
 
 
-        public async Task<String> GetResponseFromKendraAsync(String accessKey, String secret, String indexID, String query)
+        public async Task<KendraResponse> GetResponseFromKendraAsync(String accessKey, String secret, String indexID, String query)
         {
             AmazonKendraClient client = new AmazonKendraClient(accessKey, secret, kendraRegion);
             Amazon.Kendra.Model.QueryRequest request = new Amazon.Kendra.Model.QueryRequest()
@@ -578,7 +578,10 @@ namespace CheckForLocation
             Amazon.Kendra.Model.QueryResponse response = await client.QueryAsync(request);
             if (response.TotalNumberOfResults > 0)
             {
-                return response.ResultItems[0].DocumentExcerpt.Text;
+                KendraResponse KendraResponse = new KendraResponse();        
+                KendraResponse.response = response.ResultItems[0].DocumentExcerpt.Text;
+                KendraResponse.confidence = response.ResultItems[0].ScoreAttributes.ScoreConfidence;
+                return KendraResponse;
             }
             else 
             {
@@ -773,7 +776,8 @@ namespace CheckForLocation
                                 {
                                     try
                                     {
-                                        caseDetails.proposedResponse = await GetResponseFromKendraAsync(secrets.WNCProdAccessKey,secrets.WNCProdSecretAccessKey, secrets.KendraIndex, caseDetails.customerContact);
+                                        KendraResponse response = await GetResponseFromKendraAsync(secrets.WNCProdAccessKey, secrets.WNCProdSecretAccessKey, secrets.KendraIndex, caseDetails.customerContact);
+                                        caseDetails.proposedResponse = response.response;
                                         caseDetails.proposedResponseConfidence = 100;
                                         if (!await UpdateCaseDetailsAsync(caseDetails))
                                         {
