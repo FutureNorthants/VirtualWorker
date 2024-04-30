@@ -1,6 +1,8 @@
 using Amazon;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
+using Amazon.Kendra;
+using Amazon.Kendra.Model;
 using Amazon.Lambda.Core;
 using Amazon.Lex;
 using Amazon.Lex.Model;
@@ -15,12 +17,14 @@ using Amazon.StepFunctions.Model;
 using MimeKit;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Org.BouncyCastle.Bcpg;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -45,6 +49,7 @@ namespace CheckForLocation
         private static readonly RegionEndpoint primaryRegion = RegionEndpoint.EUWest2;
         private static readonly RegionEndpoint bucketRegion = RegionEndpoint.EUWest2;
         private static RegionEndpoint emailsRegion = RegionEndpoint.EUWest1;
+        private static RegionEndpoint kendraRegion = RegionEndpoint.EUWest1;
         private static readonly String secretName = "nbcGlobal";
         private static readonly String secretAlias = "AWSCURRENT";
 
@@ -73,7 +78,7 @@ namespace CheckForLocation
         private Boolean defaultRouting = false;
         private Boolean outOfArea = false;
         private Boolean reopened = false;
-        private Secrets secrets = null;
+        public Secrets secrets = null;
 
         private Location sovereignLocation;
         readonly MemoryStream memoryStream = new MemoryStream();
@@ -353,7 +358,7 @@ namespace CheckForLocation
             return links;
         }
 
-        private async Task<Boolean> GetSecrets()
+        public async Task<Boolean> GetSecrets()
         {
             IAmazonSecretsManager client = new AmazonSecretsManagerClient(primaryRegion);
 
@@ -480,9 +485,114 @@ namespace CheckForLocation
             return caseDetails;
         }
 
+        private async Task<Boolean> GetProposedResponse(CaseDetails caseDetails, String QNAurl, String QNAauth)
+        {
+            try
+            {
+                HttpClient qnaClient = new HttpClient();
+                qnaClient.DefaultRequestHeaders.Add("Authorization", secrets.QNAauth);
+                HttpResponseMessage responseMessage = await qnaClient.PostAsync(
+                     secrets.QNAurl,
+                     new StringContent("{'question':'" + HttpUtility.UrlEncode(caseDetails.customerContact) + "'}", Encoding.UTF8, "application/json"));
+                responseMessage.EnsureSuccessStatusCode();
+                string responseBody = await responseMessage.Content.ReadAsStringAsync();
+                dynamic jsonResponse = JObject.Parse(responseBody);
+                QNAResponse qnaResponse = System.Text.Json.JsonSerializer.Deserialize<QNAResponse>(responseBody);
+
+                switch (caseDetails.sovereignCouncil.ToLower())
+                {
+                    case "northampton":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "NBC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "daventry":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "DDC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "south_northants":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "SNC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "corby":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "CBC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "kettering":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "KBC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "wellingborough":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "BCW", qnaResponse.answers[0].metadata);
+                        break;
+                    case "east_northants":
+                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "ENC", qnaResponse.answers[0].metadata);
+                        break;
+                    case "northamptonshire":
+                        caseDetails.proposedResponse = qnaResponse.answers[0].answer;
+                        break;
+
+                    default:
+                        await SendFailureAsync("Unexpected sovereign council : " + caseDetails.sovereignCouncil, "QNA Error");
+                        Console.WriteLine("ERROR : Unexpected sovereign council : " + caseDetails.sovereignCouncil);
+                        return false;
+                }
+                //caseDetails.proposedResponse = jsonResponse.answers[0].answer;
+                int score = 0;
+                try
+                {
+                    if (Int32.TryParse(((String)(jsonResponse.answers[0].score)).Split('.')[0], out score))
+                    {
+                        caseDetails.proposedResponseConfidence = score;
+                    }
+                    else
+                    {
+                        await SendFailureAsync("qna Score not numeric : " + jsonResponse.answers[0].score, "QNA Error");
+                        Console.WriteLine("ERROR : qna Score not numeric : " + jsonResponse.answers[0].score);
+                        return false;
+                    }
+                }
+                catch (Exception error)
+                {
+                    await SendFailureAsync("qna Score Parse Error : " + jsonResponse.answers[0].score, error.Message);
+                    Console.WriteLine("ERROR : qna Score Parse Error : " + jsonResponse.answers[0].score + " : " + error.Message);
+                    return false;
+                }
+                if (!await UpdateCaseDetailsAsync(caseDetails))
+                {
+                    UpdateCaseString("contact-response", "invalid FAQ response");
+                }
+                return true;
+            }
+            catch (Exception error)
+            {
+                await SendFailureAsync("qna api error", error.Message);
+                Console.WriteLine("qna api error", error.Message);
+                return false;
+            }
+        }
+
+
+        public async Task<KendraResponse> GetResponseFromKendraAsync(String accessKey, String secret, String indexID, String query)
+        {
+            AmazonKendraClient client = new AmazonKendraClient(accessKey, secret, kendraRegion);
+            Amazon.Kendra.Model.QueryRequest request = new Amazon.Kendra.Model.QueryRequest()
+            {
+                IndexId = indexID,
+                QueryText = query
+            };
+            Amazon.Kendra.Model.QueryResponse response = await client.QueryAsync(request);
+            if (response.TotalNumberOfResults > 0)
+            {
+                KendraResponse KendraResponse = new KendraResponse();        
+                KendraResponse.response = response.ResultItems[0].DocumentExcerpt.Text;
+                KendraResponse.confidence = response.ResultItems[0].ScoreAttributes.ScoreConfidence;
+                return KendraResponse;
+            }
+            else 
+            {
+                throw new ApplicationException("No valid reponse found");
+            } 
+        }
+
         private async Task<Boolean> ProcessCaseAsync(CaseDetails caseDetails)
         {
             Boolean success = true;
+            Boolean useKendra = false;
             try
             {
                 if (String.IsNullOrEmpty(caseDetails.enquiryDetails))
@@ -495,6 +605,11 @@ namespace CheckForLocation
                     return await UpdateClosedCaseAsync();
                 }
 
+                if(caseDetails.Subject.ToLower().Contains("kendra"))
+                {
+                    useKendra = true;
+                }
+
                 if (caseDetails.manualReview && west)
                 {
                     String forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, caseDetails.sovereignServiceArea);
@@ -503,7 +618,7 @@ namespace CheckForLocation
                         forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
                         defaultRouting = true;
                     }
-                    success = await SendEmails(caseDetails, forwardingEmailAddress, true, false);
+                    success = await SendEmails(caseDetails, forwardingEmailAddress, true, true, false);
                     if (success)
                     {
                         caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
@@ -527,7 +642,7 @@ namespace CheckForLocation
                             forwardingEmailAddress = await GetSovereignEmailFromDynamoAsync(caseDetails.sovereignCouncil, "default");
                             defaultRouting = true;
                         }
-                        success = await SendEmails(caseDetails, forwardingEmailAddress, true, false);
+                        success = await SendEmails(caseDetails, forwardingEmailAddress, true, true, false);
                         if (success)
                         {
                             caseDetails.forward = caseDetails.sovereignCouncil + "-" + caseDetails.sovereignServiceArea;
@@ -540,12 +655,12 @@ namespace CheckForLocation
                         if (!String.IsNullOrEmpty(caseDetails.forward))
                         {
                             String forwardingEmailAddress = await NNCGetSovereignEmailFromDynamoAsync(caseDetails.forward);
-                            success = await SendEmails(caseDetails, forwardingEmailAddress, replyToCustomer, false);
+                            success = await SendEmails(caseDetails, forwardingEmailAddress, replyToCustomer, true, false);
                             replyToCustomer = false;
                         }
                         if (!String.IsNullOrEmpty(caseDetails.nncForwardEMailTo))
                         {
-                            success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer, false);
+                            success = await SendEmails(caseDetails, caseDetails.nncForwardEMailTo, replyToCustomer, true, false);
                         }
                     }
                     if (success)
@@ -555,12 +670,23 @@ namespace CheckForLocation
                 }
                 else
                 {
+                    //Working out Location and Service Area
+                    Boolean locationFromSubjectLine = false;
                     String searchText = caseDetails.enquiryDetails;
+                    //Find Location
                     if (caseDetails.customerHasUpdated)
                     {
                         searchText = caseDetails.fullEmail + " " + caseDetails.enquiryDetails;
                     }
-                    sovereignLocation = await CheckForLocationAsync(caseDetails.Subject + " " + searchText);
+                    sovereignLocation = await CheckForLocationAsync(caseDetails.Subject);
+                    if(sovereignLocation.Success)
+                    {
+                        locationFromSubjectLine= true;  
+                    }
+                    else
+                    {
+                        sovereignLocation = await CheckForLocationAsync(searchText);
+                    }
                     if (caseDetails.contactUs && !sovereignLocation.Success)
                     {
                         Console.WriteLine("INFO : Checking for Location Using customerAddress : " + caseDetails.customerAddress);
@@ -568,7 +694,7 @@ namespace CheckForLocation
                     }
                     String service = "";
                     district = caseDetails.District;
-
+                    //Find Service
                     if (caseDetails.contactUs && !String.IsNullOrEmpty(caseDetails.sovereignServiceArea))
                     {
                         Console.WriteLine(caseReference + " : SovereignServiceArea set using  : " + caseDetails.sovereignServiceArea);
@@ -578,7 +704,7 @@ namespace CheckForLocation
                     {
                         Console.WriteLine(caseReference + " : SovereignServiceArea not set using Lex ");
                         try {
-                            if (!caseDetails.Subject.ToLower().Contains("council form has been submitted"))
+                            if (!caseDetails.Subject.ToLower().Contains("council form has been submitted")&&!locationFromSubjectLine)
                             {
                                 service = await GetServiceAsync(caseDetails.Subject, true);
                             }
@@ -646,17 +772,62 @@ namespace CheckForLocation
                             {
                                 UpdateCaseBoolean("unitary", false);
                                 UpdateCaseString("email-comments", "Transitioning case to local process");
-                                await GetProposedResponse(caseDetails, secrets.nbcQNAurl, secrets.nbcQNAauth);
+                                if(useKendra)
+                                {
+                                    try
+                                    {
+                                        KendraResponse response = await GetResponseFromKendraAsync(secrets.WNCProdAccessKey, secrets.WNCProdSecretAccessKey, secrets.KendraIndex, caseDetails.customerContact);
+                                        caseDetails.proposedResponse = response.response;
+                                        caseDetails.proposedResponseConfidence = 100;
+                                        if (!await UpdateCaseDetailsAsync(caseDetails))
+                                        {
+                                            UpdateCaseString("contact-response", "invalid FAQ response");
+                                        }
+                                    }
+                                    catch(ApplicationException) { } 
+                                    catch(Exception error) 
+                                    {
+                                        Console.WriteLine("ERROR : " + caseReference + " : Using Kendra : " +  error.Message);
+                                        Console.WriteLine("ERROR : " + caseReference + " : Using Kendra : " + error.StackTrace);
+                                    }                                
+                                }
+                                else
+                                {
+                                    await GetProposedResponse(caseDetails, secrets.nbcQNAurl, secrets.nbcQNAauth);
+                                }                              
                                 await TransitionCaseAsync("awaiting-review");
                             }
                             else
                             {
-                                await GetProposedResponse(caseDetails, secrets.QNAurl, secrets.QNAauth);
                                 Boolean includeProposedResponse = false;
-                                if (caseDetails.proposedResponseConfidence >= minConfidenceLevel)
+                                if (useKendra)
                                 {
-                                    includeProposedResponse = true;
+                                    try
+                                    {
+                                        caseDetails.proposedResponse = "Response from Kendra : " + await GetResponseFromKendraAsync(secrets.WNCProdAccessKey, secrets.WNCProdSecretAccessKey, secrets.KendraIndex, caseDetails.customerContact);
+                                        caseDetails.proposedResponseConfidence = 100;
+                                        includeProposedResponse = true;
+                                        if (!await UpdateCaseDetailsAsync(caseDetails))
+                                        {
+                                            UpdateCaseString("contact-response", "invalid FAQ response");
+                                        }
+                                    }
+                                    catch (ApplicationException) { }
+                                    catch (Exception error)
+                                    {
+                                        Console.WriteLine("ERROR : " + caseReference + " : Using Kendra : " + error.Message);
+                                        Console.WriteLine("ERROR : " + caseReference + " : Using Kendra : " + error.StackTrace);
+                                    }
                                 }
+                                else
+                                {
+                                    await GetProposedResponse(caseDetails, secrets.QNAurl, secrets.QNAauth);                                  
+                                    if (caseDetails.proposedResponseConfidence >= minConfidenceLevel)
+                                    {
+                                        includeProposedResponse = true;
+                                    }
+                                }
+                                //                              
                                 if (caseDetails.proposedResponseConfidence >= minAutoRespondLevel)
                                 {
                                     UpdateCaseString("email-comments", "Automated Response");
@@ -666,18 +837,19 @@ namespace CheckForLocation
                                 {
                                     if (sovereignLocation.SovereignCouncilName.Equals("east_northants"))
                                     {
+                                        success = await SendEmails(caseDetails, null, true, false, includeProposedResponse);
                                         await TransitionCaseAsync("hub-awaiting-review");
                                     }
                                     else
                                     {
-                                        success = await SendEmails(caseDetails, forwardingEmailAddress, true, includeProposedResponse);
+                                        success = await SendEmails(caseDetails, forwardingEmailAddress, true, true, includeProposedResponse);
                                         UpdateCaseString("email-comments", "Closing case");
                                         await TransitionCaseAsync("close-case");
                                     }                                 
                                 }
                                 else
                                 {                                   
-                                    success = await SendEmails(caseDetails, forwardingEmailAddress, true, includeProposedResponse);
+                                    success = await SendEmails(caseDetails, forwardingEmailAddress, true, true, includeProposedResponse);
                                     Console.WriteLine(caseReference + " : Finished sending emails");
                                     UpdateCaseString("email-comments", "Closing case");
                                     Console.WriteLine(caseReference + " : Finished updating case");
@@ -852,7 +1024,7 @@ namespace CheckForLocation
             return emailBody;
         }
 
-        private async Task<Location> CheckForLocationAsync(String emailBody)
+        public async Task<Location> CheckForLocationAsync(String emailBody)
         {
             Console.WriteLine("INFO : Checking for Location");
             emailBody = emailBody.Replace("\n", " ");
@@ -870,12 +1042,17 @@ namespace CheckForLocation
             {
                 MatchCollection matches = Regex.Matches(emailBody, regString);
 
-                foreach (Match match in matches)
+                for (int currentPostcode = 0; currentPostcode < matches.Count; currentPostcode++)
                 {
+                    Boolean lastEntry = false;
+                    if (currentPostcode == matches.Count - 1)
+                    {
+                        lastEntry = true;
+                    }
                     sovereignLocation.PostcodeFound = true;
-                    GroupCollection groups = match.Groups;
+                    GroupCollection groups = matches[currentPostcode].Groups;
                     Console.WriteLine(caseReference + " : INFO : CheckPostcode input : " + groups[0].Value);
-                    Postcode postCodeData = await CheckPostcode(groups[0].Value);
+                    Postcode postCodeData = await CheckPostcode(groups[0].Value,lastEntry);
                     Console.WriteLine(caseReference + " : INFO : CheckPostcode response : " + postCodeData.success);
                     try
                     {
@@ -889,6 +1066,26 @@ namespace CheckForLocation
                     }
                     catch (Exception) { }
                 }
+
+                //foreach (Match match in matches)
+                //{
+                //    sovereignLocation.PostcodeFound = true;
+                //    GroupCollection groups = match.Groups;
+                //    Console.WriteLine(caseReference + " : INFO : CheckPostcode input : " + groups[0].Value);
+                //    Postcode postCodeData = await CheckPostcode(groups[0].Value);
+                //    Console.WriteLine(caseReference + " : INFO : CheckPostcode response : " + postCodeData.success);
+                //    try
+                //    {
+                //        if (postCodeData.success)
+                //        {
+                //            sovereignLocation.SovereignCouncilName = postCodeData.SovereignCouncilName;
+                //            sovereignLocation.sovereignWest = postCodeData.west;
+                //            sovereignLocation.Success = true;
+                //            return sovereignLocation;
+                //        }
+                //    }
+                //    catch (Exception) { }
+                //}
             }
 
             if (sovereignLocation.PostcodeFound)
@@ -1018,9 +1215,12 @@ namespace CheckForLocation
             return sovereignLocation;
         }
 
-        private async Task<Postcode> CheckPostcode(String postcode)
+        private async Task<Postcode> CheckPostcode(String postcode, Boolean lastEntry)
         {
             Postcode postCodeData = new Postcode();
+
+            Regex rgx = new Regex("[^a-zA-Z0-9 -]");
+            postcode = rgx.Replace(postcode, "");
 
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, postCodeURL + postcode.Replace(" ", ""));
 
@@ -1102,7 +1302,10 @@ namespace CheckForLocation
             else
             {
                 postCodeData.success = false;
-                UpdateCaseString("email-comments",  "Postcode API failed - assigned to staff");
+                if (lastEntry)
+                {
+                    UpdateCaseString("email-comments", "Postcode API failed - assigned to staff");
+                }             
             }
             return postCodeData;
         }
@@ -1305,7 +1508,7 @@ namespace CheckForLocation
             }
         }
 
-        private async Task<String> NNCGetSovereignEmailFromDynamoAsync(String sovereignName)
+        public async Task<String> NNCGetSovereignEmailFromDynamoAsync(String sovereignName)
         {
             try
             {
@@ -1360,7 +1563,7 @@ namespace CheckForLocation
 
         }
 
-        private async Task<Boolean> SendEmails(CaseDetails caseDetails, String forwardingEmailAddress, Boolean replyToCustomer, Boolean useProposedResponse)
+        private async Task<Boolean> SendEmails(CaseDetails caseDetails, String forwardingEmailAddress, Boolean replyToCustomer, Boolean forward, Boolean useProposedResponse)
         {
             try
             {
@@ -1409,62 +1612,73 @@ namespace CheckForLocation
 
                 Console.WriteLine(caseReference + " : Sending forward email");
 
-                if (west && caseDetails.sovereignCouncil.ToLower().Equals("northampton") && defaultRouting)
+                if (forward)
                 {
-                    Console.WriteLine(caseReference + " : Local default case no forward necessary");
-                }
-                else
-                {
-                    Console.WriteLine(caseReference + " : Preparing to forward email");
-                    String forwardFileName = "";
-                    if (caseDetails.contactUs)
+                    if (west && caseDetails.sovereignCouncil.ToLower().Equals("northampton") && defaultRouting)
                     {
-                        Console.WriteLine(caseReference + " : ContactUs case");
-                        if (useProposedResponse)
+                        Console.WriteLine(caseReference + " : Local default case no forward necessary");
+                    }
+                    else
+                    {
+                        Console.WriteLine(caseReference + " : Preparing to forward email");
+                        String forwardFileName = "";
+                        if (caseDetails.contactUs)
                         {
-                            forwardFileName = "email-sovereign-forward-contactus-incresponse.txt";
+                            Console.WriteLine(caseReference + " : ContactUs case");
+                            if (useProposedResponse)
+                            {
+                                forwardFileName = "email-sovereign-forward-contactus-incresponse.txt";
+                            }
+                            else
+                            {
+                                forwardFileName = "email-sovereign-forward-contactus.txt";
+                            }
                         }
                         else
                         {
-                            forwardFileName = "email-sovereign-forward-contactus.txt";
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine(caseReference + " : Email case");
-                        forwardFileName = "email-sovereign-forward.txt";
-                    }
-                    //TODO this is where email forwarding happens
-                    emailBody = await FormatEmailAsync(caseDetails, forwardFileName);
-                    Console.WriteLine(caseReference + " : Email contents set");
-                    if (!String.IsNullOrEmpty(emailBody))
-                    {
-                        String subjectPrefix = "";
-                        if (!liveInstance)
-                        {
-                            if (!String.IsNullOrEmpty(caseDetails.forward))
+                            if (useProposedResponse)
                             {
-                                subjectPrefix = "(" + caseDetails.forward + ") ";
+                                forwardFileName = "email-sovereign-forward-inc-response.txt";
                             }
-                            subjectPrefix += "TEST - ";
+                            else
+                            {
+                                forwardFileName = "email-sovereign-forward.txt";
+                            }
+                            Console.WriteLine(caseReference + " : Email case");
                         }
-                        if (!await SendEmailAsync(secrets.OrganisationNameShort, norbertSendFrom, forwardingEmailAddress.ToLower(), bccEmailAddress, subjectPrefix + "Hub case reference number is " + caseReference, caseDetails.emailID, emailBody, "", true))
+                        //TODO this is where email forwarding happens
+                        emailBody = await FormatEmailAsync(caseDetails, forwardFileName);
+                        Console.WriteLine(caseReference + " : Email contents set");
+                        if (!String.IsNullOrEmpty(emailBody))
                         {
-                            Console.WriteLine(caseReference + " : ERROR : Failed to forward email");
+                            String subjectPrefix = "";
+                            if (!liveInstance)
+                            {
+                                if (!String.IsNullOrEmpty(caseDetails.forward))
+                                {
+                                    subjectPrefix = "(" + caseDetails.forward + ") ";
+                                }
+                                subjectPrefix += "TEST - ";
+                            }
+                            if (!await SendEmailAsync(secrets.OrganisationNameShort, norbertSendFrom, forwardingEmailAddress.ToLower(), bccEmailAddress, subjectPrefix + "Hub case reference number is " + caseReference, caseDetails.emailID, emailBody, "", true))
+                            {
+                                Console.WriteLine(caseReference + " : ERROR : Failed to forward email");
+                                UpdateCaseString("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
+                                return false;
+                            }
+                            Console.WriteLine(caseReference + " : Forwarded email");
+                            UpdateCaseString("email-comments", "Forwarded email to " + forwardingEmailAddress.ToLower());
+                        }
+                        else
+                        {
+                            Console.WriteLine(caseReference + "ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
                             UpdateCaseString("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
+                            await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
                             return false;
                         }
-                        Console.WriteLine(caseReference + " : Forwarded email");
-                        UpdateCaseString("email-comments", "Forwarded email to " + forwardingEmailAddress.ToLower());
-                    }
-                    else
-                    {
-                        Console.WriteLine(caseReference + "ERROR : ProcessCaseAsyn : Empty Message Body : " + caseReference);
-                        UpdateCaseString("email-comments", "Failed to forward email to " + forwardingEmailAddress.ToLower());
-                        await SendFailureAsync("Empty Message Body : " + caseReference, "ProcessCaseAsync");
-                        return false;
                     }
                 }
+               
                 Console.WriteLine(caseReference + " : SendEmails Ended");
                 return true;
             }
@@ -1613,9 +1827,11 @@ namespace CheckForLocation
             using AmazonSimpleEmailServiceClient client = new AmazonSimpleEmailServiceClient(RegionEndpoint.EUWest1);
             try
             {
-                SendRawEmailRequest sendRequest = new SendRawEmailRequest { RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, bccAddress, includeOriginalEmail)) };
-                //sendRequest.Source = "norbert@wnc.northampton.digital";
-                //sendRequest.ReturnPathArn = "arn:aws:ses:eu-west-1:898823515462:identity/northampton.digital";
+                SendRawEmailRequest sendRequest = new SendRawEmailRequest
+                {
+                    RawMessage = new RawMessage(await GetMessageStreamAsync(from, fromAddress, toAddress, subject, emailID, htmlBody, bccAddress, includeOriginalEmail)),
+                    ConfigurationSetName = "AllMail"
+                };
                 SendRawEmailResponse response = await client.SendRawEmailAsync(sendRequest);
                 return true;
             }
@@ -1652,9 +1868,7 @@ namespace CheckForLocation
             message.To.Add(new MailboxAddress(string.Empty, toAddress));
             message.Bcc.Add(new MailboxAddress(string.Empty, bccAddress));
             message.Subject = subject;
-            message.Headers.Add(new Header("Return-Path", "norbert@northampton.digital"));
-
-            try
+             try
             {
                 message = await GetMessageBodyAsync(message, emailID, htmlBody, includeOriginalEmail);
                 return message;
@@ -1755,83 +1969,7 @@ namespace CheckForLocation
                 return await TransitionCaseAsync("hub-awaiting-review");
             }
         }
-        private async Task<Boolean> GetProposedResponse(CaseDetails caseDetails, String QNAurl, String QNAauth)
-        {
-            try
-            {
-                HttpClient qnaClient = new HttpClient();
-                qnaClient.DefaultRequestHeaders.Add("Authorization", secrets.QNAauth);
-                HttpResponseMessage responseMessage = await qnaClient.PostAsync(
-                     secrets.QNAurl,
-                     new StringContent("{'question':'" + HttpUtility.UrlEncode(caseDetails.customerContact) + "'}", Encoding.UTF8, "application/json"));
-                responseMessage.EnsureSuccessStatusCode();
-                string responseBody = await responseMessage.Content.ReadAsStringAsync();
-                dynamic jsonResponse = JObject.Parse(responseBody);
-                QNAResponse qnaResponse = System.Text.Json.JsonSerializer.Deserialize<QNAResponse>(responseBody);
- 
-                switch (caseDetails.sovereignCouncil.ToLower())
-                {
-                    case "northampton":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "NBC", qnaResponse.answers[0].metadata);
-                        break;
-                    case "daventry":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "DDC", qnaResponse.answers[0].metadata);
-                        break;
-                    case "south_northants":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "SNC", qnaResponse.answers[0].metadata);
-                        break;
-                    case "corby":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "CBC", qnaResponse.answers[0].metadata);
-                        break;
-                    case "kettering":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "KBC", qnaResponse.answers[0].metadata);
-                        break;
-                    case "wellingborough":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "BCW", qnaResponse.answers[0].metadata);
-                        break;
-                    case "east_northants":
-                        caseDetails.proposedResponse = await ReplaceResponseTags(qnaResponse.answers[0].answer, "ENC", qnaResponse.answers[0].metadata);
-                        break;
-                    default:
-                        await SendFailureAsync("Unexpected sovereign council : " + caseDetails.sovereignCouncil,"QNA Error");
-                        Console.WriteLine("ERROR : Unexpected sovereign council : " + caseDetails.sovereignCouncil);
-                        return false;
-                }
-                //caseDetails.proposedResponse = jsonResponse.answers[0].answer;
-                int score = 0;
-                try
-                {
-                    if (Int32.TryParse(((String)(jsonResponse.answers[0].score)).Split('.')[0], out score))
-                    {
-                        caseDetails.proposedResponseConfidence = score;
-                    }
-                    else
-                    {
-                        await SendFailureAsync("qna Score not numeric : " + jsonResponse.answers[0].score, "QNA Error");
-                        Console.WriteLine("ERROR : qna Score not numeric : " + jsonResponse.answers[0].score);
-                        return false;
-                    }
-                }
-                catch (Exception error)
-                {
-                    await SendFailureAsync("qna Score Parse Error : " + jsonResponse.answers[0].score, error.Message);
-                    Console.WriteLine("ERROR : qna Score Parse Error : " + jsonResponse.answers[0].score + " : " + error.Message);
-                    return false;
-                }
-                if (!await UpdateCaseDetailsAsync(caseDetails))
-                {
-                    UpdateCaseString("contact-response", "invalid FAQ response");
-                }
-                return true;
-            }
-            catch (Exception error)
-            {
-                await SendFailureAsync("qna api error" , error.Message);
-                Console.WriteLine("qna api error", error.Message);
-                return false;
-            }
-        }
-
+       
         private async Task<String> ReplaceResponseTags(String response, String sovereign, Metadata[] tags)
         {
             try
@@ -1924,13 +2062,13 @@ namespace CheckForLocation
             if (caseDetails.proposedResponseConfidence < minConfidenceLevel)
             {
                 cxmPayload = new Dictionary<string, string>
-                {
-                    { "response-confidence", caseDetails.proposedResponseConfidence.ToString()}
-                };
+                    {
+                        { "response-confidence", caseDetails.proposedResponseConfidence.ToString()}
+                    };
             }
             else
             {
-                if (caseDetails.proposedResponseConfidence > minAutoRespondLevel)
+                if (caseDetails.proposedResponseConfidence >= minAutoRespondLevel)
                 {
                     cxmPayload = new Dictionary<string, string>
                     {
@@ -2056,6 +2194,9 @@ public class Secrets
     public String minResponseConfidenceLevel { get; set; }
     public String minAutoResponseLevelTest { get; set; }
     public String minAutoResponseLevelLive { get; set; }
+    public String WNCProdAccessKey { get; set; }
+    public String WNCProdSecretAccessKey { get; set; }
+    public String KendraIndex { get; set; } 
 }
 
 public class Location
